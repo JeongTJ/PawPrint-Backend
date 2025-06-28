@@ -1,0 +1,4 @@
+.idea/
+db/data/
+.env
+backend/srcs/node_modules/
