@@ -1,0 +1,45 @@
+const { pool } = require('../config/psqlConfig');
+
+const findAll = async () => {
+	const { rows } = await pool.query('SELECT * FROM members ORDER BY id ASC');
+	return rows;
+};
+
+const findById = async (id) => {
+	const { rows } = await pool.query('SELECT * FROM members WHERE id = $1', [id]);
+	return rows[0];
+};
+
+const create = async (memberData) => {
+	const { user_id, name, email, password } = memberData;
+
+	const { rows } = await pool.query(
+		'INSERT INTO members (user_id, name, email, password) VALUES ($1, $2, $3, $4) RETURNING *',
+		[user_id, name, email, password]
+	);
+	delete rows[0].password;
+	return rows[0];
+};
+
+const findByEmail = async (email) => {
+	const { rows } = await pool.query('SELECT * FROM members WHERE email = $1', [email]);
+	return rows[0];
+};
+
+
+const update = async (id, memberData) => {
+	const { name, profile, status_note } = memberData;
+	const { rows } = await pool.query(
+		'UPDATE members SET name = $1, profile = $2, status_note = $3, updated_at = now() WHERE id = $4 RETURNING *',
+		[name, profile, status_note, id]
+	);
+	delete rows[0].password;
+	return rows[0];
+};
+
+module.exports = {
+	findAll,
+	findById,
+	create,
+	update,
+};
