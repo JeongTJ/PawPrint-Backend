@@ -1,28 +1,80 @@
+const jwt = require('jsonwebtoken');
+const membersServices = require('./membersServices');
 
-const a = async () => {
-	try {
-		const { id } = req.query;
-		if (!id) {
-			return res.status(400).json({ error: 'User ID must be provided as a query parameter.' });
-		}
-	
-		const member = await membersServices.findById(id);
-		if (!member) {
-			return res.status(404).json({ error: `Member with id ${id} not found.` });
-		}
-	
-		if (!process.env.JWT_SECRET) {
-			console.error('JWT_SECRET is not set in environment variables.');
-			return res.status(500).json({ error: 'JWT secret is not configured.' });
-		}
-		
-		const token = jwt.sign({ id: parseInt(id, 10) }, process.env.JWT_SECRET, {
-			expiresIn: '1h',
-		});
-	
-		res.json({ token });
-	} catch (error) {
-		console.error('Error generating test token:', error);
-		res.status(500).json({ error: 'Internal server error' });
+const generateTokens = async (id) => {
+	if (!id) {
+		const error = new Error('User ID must be provided as a query parameter.');
+		error.statusCode = 404;
+		throw error;
 	}
+
+	const member = await membersServices.findById(id);
+
+	if (!member) {
+		const error = new Error(`Member with id ${id} not found.`);
+		error.statusCode = 404;
+		throw error;
+	}
+
+	if (!process.env.JWT_SECRET) {
+		const error = new Error('JWT_SECRET is not set in environment variables.');
+		error.statusCode = 500;
+		throw error;
+	}
+
+	const refreshToken = jwt.sign(
+		{ id: parseInt(member.id, 10), type: 'refresh' }, 
+		process.env.JWT_SECRET, 
+		{ expiresIn: '1d',}
+	);
+
+	const accessToken = jwt.sign(
+		{ id: parseInt(member.id, 10), type: 'access'}, 
+		process.env.JWT_SECRET, 
+		{ expiresIn: '1h',}
+	);
+
+	return { refreshToken, accessToken };
+}
+
+const refreshToken = async (refreshToken) => {
+	const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+	const member = await membersServices.findById(decoded.id);
+
+	if (!member) {
+		const error = new Error(`Member with id ${decoded.id} not found.`);
+		error.statusCode = 404;
+		throw error;
+	}
+
+	if (decoded.type !== 'refresh') {
+		const error = new Error('Invalid token type. An access token is required.');
+		error.statusCode = 401;
+		throw error;
+	}
+
+	if (member.refresh_token !== refreshToken) {
+		const error = new Error('Invalid refresh token.');
+		error.statusCode = 401;
+		throw error;
+	}
+
+	const newRefreshToken = jwt.sign(
+		{ id: parseInt(member.id, 10), type: 'refresh' }, 
+		process.env.JWT_SECRET,
+		{ expiresIn: '1d' }
+	);
+
+	const newAccessToken = jwt.sign(
+		{ id: parseInt(member.id, 10), type: 'access' }, 
+		process.env.JWT_SECRET,
+		{ expiresIn: '1d' }
+	);
+
+	return { newRefreshToken, newAccessToken };
+}
+
+module.exports = {
+	generateTokens,
+	refreshToken,
 }
