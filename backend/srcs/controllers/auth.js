@@ -79,7 +79,7 @@ router.post('/refresh-token', async (req, res) => {
 		const { refreshToken } = req.body;
 		const { newRefreshToken, newAccessToken } = await authServices.refreshToken(refreshToken);
 		
-		res.json({ refreshToken: newRefreshToken });
+		res.json({ refreshToken: newRefreshToken, accessToken: newAccessToken });
 	} catch (error) {
 		console.error('Error refreshing token:', error);
 		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
