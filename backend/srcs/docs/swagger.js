@@ -16,6 +16,13 @@ const options = {
 			},
 		],
 		components: {
+			securitySchemes: {
+				bearerAuth: {
+					type: 'http',
+					scheme: 'bearer',
+					bearerFormat: 'JWT',
+				},
+			},
 			schemas: {
 				Plan: {                // ← 여기!
 					type: 'object',
@@ -38,8 +45,16 @@ const options = {
 				},
 				Member: Member,
 				MemberView: MemberView,
+				Auth: {
+					type: 'object',
+					properties: {
+						token: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_...' },
+					},
+					required: ['token'],
+				},
 			},
 		},
+		security: [{ bearerAuth: [] }],
 	},
 	// Swagger 주석을 읽어들일 파일 경로
 	apis: ['./controllers/*.js'],
