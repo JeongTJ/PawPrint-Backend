@@ -38,10 +38,18 @@ const findByEmail = async (email) => {
 
 // 특정 회원 정보 업데이트
 const update = async (id, memberData) => {
-	const { name, profile, status_note } = memberData;
+	const { name, profile, status_note, refresh_token } = memberData;
 	const { rows } = await pool.query(
-		'UPDATE members SET name = $1, profile = $2, status_note = $3, updated_at = now() WHERE id = $4 RETURNING *',
-		[name, profile, status_note, id]
+		`UPDATE members 
+		SET 
+			name = COALESCE($1, name),
+			profile = COALESCE($2, profile), 
+			status_note = COALESCE($3, status_note), 
+			refresh_token = COALESCE($4, refresh_token), 
+			updated_at = now() 
+		WHERE id = $5 
+		RETURNING *`,
+		[name, profile, status_note, refresh_token, id]
 	);
 	delete rows[0].password;
 	return rows[0];
