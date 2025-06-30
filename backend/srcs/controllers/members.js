@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const membersServices = require('../services/membersServices');
+const { authMiddleware } = require('../middlewares/auth');
 
 /**
  * @openapi
@@ -34,6 +35,18 @@ const membersServices = require('../services/membersServices');
  *             schema:
  *               $ref: '#/components/schemas/Member'
  *
+ * /api/members/me:
+ *   get:
+ *     summary: 내 정보 조회
+ *     tags: [members]
+ *     responses:
+ *       200:
+ *         description: 내 정보
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MemberView'
+ * 
  * /api/members/{memberId}:
  *   get:
  *     summary: 특정 회원 조회
@@ -85,7 +98,26 @@ router.post('/', async (req, res) => {
 	res.status(201).json(member);
 });
 
-router.get('/:memberId', async (req, res) => {
+// "내" 정보 조회 API (토큰 기반)
+router.get('/me', authMiddleware, async (req, res) => {
+	try {
+		// authMiddleware가 req.user에 저장해준 사용자 정보를 사용합니다.
+		const memberId = req.user.id; 
+		const member = await membersServices.findById(memberId);
+		
+		if (!member) {
+			// 토큰은 유효하지만 해당 유저가 DB에 없는 경우
+			return res.status(404).json({ error: 'Member not found' });
+		}
+		res.json(member);
+
+	} catch (error) {
+		res.status(500).json({ error: 'Internal server error' });
+	}
+});
+
+// 특정 회원 조회 (ID 기반) - 관리자용 또는 다른 사용자 프로필 조회용
+router.get('/:memberId', authMiddleware, async (req, res) => {
 	try {
 		const { memberId } = req.params;
 		const member = await membersServices.findById(memberId);
@@ -98,12 +130,17 @@ router.get('/:memberId', async (req, res) => {
 	}
 });
 
-router.patch('/:memberId', async (req, res) => {
+router.patch('/:memberId', authMiddleware, async (req, res) => {
 	try {
 		const { memberId } = req.params;
+
+		// "내 정보 수정"은 이제 /me 엔드포인트를 만들어 처리하거나,
+		// 여기서 권한 검사를 강화할 수 있습니다.
+		if (req.user.id !== parseInt(memberId, 10)) {
+			return res.status(403).json({ error: 'Permission denied.' });
+		}
+
 		const memberData = req.body;
-		console.log(member);
-		console.log(memberData);
 		const member = await membersServices.update(memberId, memberData);
 		if (!member) {
 			return res.status(404).json({ error: `memberId ${memberId} member not found` });
@@ -113,25 +150,5 @@ router.patch('/:memberId', async (req, res) => {
 		res.status(500).json({ error: 'Internal server error' });
 	}
 });
-
-// // POST /api/members
-// router.post('/', (req, res) => {
-// 	pool.query('SELECT NOW()', (err, res) => {
-// 		if (err) {
-// 			console.error('Error executing query', err);
-// 			res.status(500).json({ error: 'Database error' });
-// 			return;
-// 		}
-// 	});
-//   const member = req.body;
-//   member.id = 1; // 예시 고정 값
-//   res.status(201).json(member);
-// });
-
-// // GET /api/members/:memberId
-// router.get('/:memberId', (req, res) => {
-//   const { memberId } = req.params;
-//   res.json({ id: Number(memberId), title: '산책', date: '2024-06-30' });
-// });
 
 module.exports = router;

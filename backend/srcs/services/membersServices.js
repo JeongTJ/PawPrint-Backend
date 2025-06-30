@@ -1,6 +1,7 @@
 const membersRepository = require('../repository/membersRepository');
 const bcrypt = require('bcrypt');
 
+// 모든 회원 찾기
 const findAll = async () => {
 	return await membersRepository.findAll();
 };
@@ -23,4 +24,15 @@ const findById = async (id) => {
 	return member;
 };
 
-module.exports = { findAll, create, update, findById };
+const findByUserId = async (user_id) => {
+	const member = await membersRepository.findByUserId(user_id);
+	return member;
+};
+
+module.exports = { 
+	findAll, 
+	create, 
+	update, 
+	findByUserId, 
+	findById 
+};
