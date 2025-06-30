@@ -17,6 +17,7 @@ daemon:
 down:
 	docker-compose down
 
+
 clean:
 	docker-compose down
 	rm -rf ./db/data
