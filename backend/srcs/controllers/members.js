@@ -1,16 +1,17 @@
 const express = require('express');
 const router  = express.Router();
 const membersServices = require('../services/membersServices');
+const { authMiddleware } = require('../middlewares/auth');
 
 /**
  * @openapi
  * /api/members:
  *   get:
- *     summary: 모든 계획 조회
+ *     summary: 모든 회원 조회
  *     tags: [members]
  *     responses:
  *       200:
- *         description: 계획 목록
+ *         description: 회원 목록
  *         content:
  *           application/json:
  *             schema:
@@ -18,7 +19,7 @@ const membersServices = require('../services/membersServices');
  *               items:
  *                 $ref: '#/components/schemas/MemberView'
  *   post:
- *     summary: 새 계획 생성
+ *     summary: 새 회원 생성
  *     tags: [members]
  *     requestBody:
  *       required: true
@@ -28,51 +29,57 @@ const membersServices = require('../services/membersServices');
  *             $ref: '#/components/schemas/Member'
  *     responses:
  *       201:
- *         description: 생성된 계획
+ *         description: 생성된 회원
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Member'
  *
- * /api/plans/{planId}:
+ * /api/members/me:
  *   get:
- *     summary: 특정 계획 조회
- *     tags: [Plans]
- *     parameters:
- *       - in: path
- *         name: planId
- *         required: true
- *         schema:
- *           type: integer
+ *     summary: 내 정보 조회
+ *     tags: [members]
  *     responses:
  *       200:
- *         description: 단일 계획
+ *         description: 내 정보
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Plan'
+ *               $ref: '#/components/schemas/MemberView'
  *   patch:
- *     summary: 특정 계획 수정
- *     tags: [Plans]
- *     parameters:
- *       - in: path
- *         name: planId
- *         required: true
- *         schema:
- *           type: integer
+ *     summary: 내 정보 수정
+ *     tags: [members]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/Plan'
+ *             $ref: '#/components/schemas/Member'
  *     responses:
  *       200:
- *         description: 단일 계획
+ *         description: 수정된 회원 정보
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Plan'
+ *               $ref: '#/components/schemas/Member'
+ * 
+ * /api/members/{memberId}:
+ *   get:
+ *     summary: 특정 회원 조회
+ *     tags: [members]
+ *     parameters:
+ *       - in: path
+ *         name: memberId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 단일 회원
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Member'
  */
 
 router.get('/', async (req, res) => {
@@ -85,53 +92,40 @@ router.post('/', async (req, res) => {
 	res.status(201).json(member);
 });
 
-router.get('/:memberId', async (req, res) => {
+// "내" 정보 조회 API (토큰 기반)
+router.get('/me', authMiddleware, async (req, res) => {
+	try {
+		// authMiddleware가 req.user에 저장해준 사용자 정보를 사용합니다.
+		const memberId = req.user.id; 
+		const member = await membersServices.findById(memberId);
+		
+		res.json(member);
+	} catch (error) {
+		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+	}
+});
+
+router.patch('/me', authMiddleware, async (req, res) => {
+	try {
+		const memberId = req.user.id; 
+		const member = await membersServices.update(memberId, req.body);
+		res.json(member);
+	} catch (error) {
+		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+	}
+});
+
+// 특정 회원 조회 (ID 기반) - 관리자용 또는 다른 사용자 프로필 조회용
+router.get('/:memberId', authMiddleware, async (req, res) => {
 	try {
 		const { memberId } = req.params;
 		const member = await membersServices.findById(memberId);
-		if (!member) {
-			return res.status(404).json({ error: `memberId ${memberId} Member not found` });
-		}
+		
 		res.json(member);
 	} catch (error) {
-		res.status(500).json({ error: 'Internal server error' });
+		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
 	}
 });
 
-router.patch('/:memberId', async (req, res) => {
-	try {
-		const { memberId } = req.params;
-		const memberData = req.body;
-		console.log(member);
-		console.log(memberData);
-		const member = await membersServices.update(memberId, memberData);
-		if (!plan) {
-			return res.status(404).json({ error: `planId ${planId} Plan not found` });
-		}
-		res.json(plan);
-	} catch (error) {
-		res.status(500).json({ error: 'Internal server error' });
-	}
-});
-
-// // POST /api/plans
-// router.post('/', (req, res) => {
-// 	pool.query('SELECT NOW()', (err, res) => {
-// 		if (err) {
-// 			console.error('Error executing query', err);
-// 			res.status(500).json({ error: 'Database error' });
-// 			return;
-// 		}
-// 	});
-//   const plan = req.body;
-//   plan.id = 1; // 예시 고정 값
-//   res.status(201).json(plan);
-// });
-
-// // GET /api/plans/:planId
-// router.get('/:planId', (req, res) => {
-//   const { planId } = req.params;
-//   res.json({ id: Number(planId), title: '산책', date: '2024-06-30' });
-// });
 
 module.exports = router;

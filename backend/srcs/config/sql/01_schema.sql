@@ -1,14 +1,15 @@
 -- member 테이블
 CREATE TABLE IF NOT EXISTS members (
-    "id"          BIGSERIAL PRIMARY KEY,
-    "user_id"     TEXT UNIQUE NOT NULL, -- 로그인 ID
-    "name"        TEXT NOT NULL,
-    "password"    TEXT NOT NULL,
-    "email"       TEXT NOT NULL,
-    "profile"     TEXT,
-    "status_note" TEXT,
-    "created_at"  TIMESTAMPTZ DEFAULT now(),
-    "updated_at"  TIMESTAMPTZ DEFAULT now()
+    "id"              BIGSERIAL PRIMARY KEY,
+    "user_id"         TEXT UNIQUE NOT NULL, -- 로그인 ID
+    "name"            TEXT NOT NULL,
+    "password"        TEXT NOT NULL,
+    "email"           TEXT NOT NULL,
+    "profile"         TEXT,
+    "status_note"     TEXT,
+	"refresh_token"   TEXT,
+    "created_at"      TIMESTAMPTZ DEFAULT now(),
+    "updated_at"      TIMESTAMPTZ DEFAULT now()
 );
 
 -- Plan 테이블

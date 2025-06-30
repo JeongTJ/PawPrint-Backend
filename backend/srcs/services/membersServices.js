@@ -1,6 +1,7 @@
 const membersRepository = require('../repository/membersRepository');
 const bcrypt = require('bcrypt');
 
+// 모든 회원 찾기
 const findAll = async () => {
 	return await membersRepository.findAll();
 };
@@ -15,12 +16,37 @@ const create = async (memberData) => {
 };
 
 const update = async (id, memberData) => {
-	return await membersRepository.update(id, memberData);
+	const member = await membersRepository.update(id, memberData);
+	
+	if (!member) {
+		const error = new Error(`Member with id ${id} not found.`);
+		error.statusCode = 404;
+		throw error;
+	}
+	return member;
+
 }
 
 const findById = async (id) => {
 	const member = await membersRepository.findById(id);
+
+	if (!member) {
+		const error = new Error(`Member with id ${id} not found.`);
+		error.statusCode = 404;
+		throw error;
+	}
 	return member;
 };
 
-module.exports = { findAll, create, update, findById };
+const findByUserId = async (user_id) => {
+	const member = await membersRepository.findByUserId(user_id);
+	return member;
+};
+
+module.exports = { 
+	findAll, 
+	create, 
+	update, 
+	findByUserId, 
+	findById 
+};
