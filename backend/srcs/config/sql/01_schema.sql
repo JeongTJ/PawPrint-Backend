@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS members (
 CREATE TABLE IF NOT EXISTS contents (
     "id"              BIGSERIAL PRIMARY KEY,
     "member_id"       BIGINT REFERENCES members(id) ON DELETE CASCADE,
-    "type"            VARCHAR(10) NOT NULL CHECK (type IN ('qna','community')),
+    "content_type"    VARCHAR(10) NOT NULL CHECK (content_type IN ('qna','community')),
     "body"            TEXT,
     "likes_count"     INTEGER DEFAULT 0,
     "comments_count"  INTEGER DEFAULT 0,
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS comments (
 CREATE TABLE IF NOT EXISTS media (
     "id"              BIGSERIAL PRIMARY KEY,
     "content_id"      BIGINT REFERENCES contents(id) ON DELETE CASCADE,
-    "file_path"       TEXT NOT NULL,
+    "file_url"       TEXT NOT NULL,
     "created_at"      TIMESTAMPTZ DEFAULT now(),
     "updated_at"      TIMESTAMPTZ DEFAULT now()
 );
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS media (
 CREATE OR REPLACE FUNCTION block_qna_media()
 RETURNS TRIGGER AS $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM contents WHERE id = NEW.content_id AND type = 'qna') THEN
+    IF EXISTS (SELECT 1 FROM contents WHERE id = NEW.content_id AND content_type = 'qna') THEN
         RAISE EXCEPTION 'Q&A 글에는 이미지를 첨부할 수 없습니다 (content_id=%).', NEW.content_id;
     END IF;
     RETURN NEW;
