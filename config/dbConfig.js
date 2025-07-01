@@ -1,6 +1,7 @@
 const { Pool } = require('pg');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
+require('dotenv').config();
 
 // 환경별 데이터베이스 설정
 let poolConfig;
