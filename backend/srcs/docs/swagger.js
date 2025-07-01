@@ -1,5 +1,12 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const { Member, MemberView } = require('./memberSchemas');
+const { 
+	ContentSearchRequest, 
+	ContentCreateRequest, 
+	ContentUpdateRequest, 
+	ContentDeleteRequest, 
+	ContentResponse
+} = require('./contentSchemas');
 
 const options = {
 	definition: {
@@ -43,6 +50,13 @@ const options = {
 					},
 					required: ['title', 'date'],
 				},
+
+				ContentSearchRequest: ContentSearchRequest,
+				ContentCreateRequest: ContentCreateRequest,
+				ContentUpdateRequest: ContentUpdateRequest,
+				ContentDeleteRequest: ContentDeleteRequest,
+				ContentResponse: ContentResponse,
+
 				Member: Member,
 				MemberView: MemberView,
 				Auth: {
