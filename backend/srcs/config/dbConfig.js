@@ -2,20 +2,38 @@ const { Pool } = require('pg');
 const { readFile } = require('node:fs/promises');
 const path = require('node:path');
 
-const pool = new Pool({
-	user: process.env.DB_USER,
-	host: process.env.DB_HOST,
-	database: process.env.DB_NAME,
-	password: process.env.DB_PASSWORD,
-	port: process.env.DB_PORT,
-});
+// 환경별 데이터베이스 설정
+let poolConfig;
+
+
+if (process.env.NODE_ENV === 'production') {
+	// 배포 환경: Supabase 사용
+	console.log('🏭 Production DB: Supabase 연결');
+	poolConfig = {
+		connectionString: process.env.SUPABASE_URL,
+	};
+} else {
+	// 개발 환경: 로컬 PostgreSQL 사용
+	console.log('🛠️ Development DB: Supabase 연결');
+	poolConfig = {
+		connectionString: process.env.SUPABASE_URL,
+	};
+	// poolConfig = {
+	// 	user: process.env.DB_USER,
+	// 	host: process.env.DB_HOST,
+	// 	database: process.env.DB_NAME,
+	// 	password: process.env.DB_PASSWORD,
+	// 	port: process.env.DB_PORT,
+	// };
+}
+
+const pool = new Pool(poolConfig);
 
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000; // 1초
 
 // 1초 대기하는 헬퍼 함수
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 
 async function initSchema() {
 	const sql = await readFile(path.join(__dirname, '/sql/01_schema.sql'), 'utf8');

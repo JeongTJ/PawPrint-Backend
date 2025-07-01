@@ -1,4 +1,4 @@
-const { pool } = require('../config/psqlConfig');
+const { pool } = require('../config/dbConfig');
 
 // 모든 계획 조회 (Read)
 const findAll = async () => {

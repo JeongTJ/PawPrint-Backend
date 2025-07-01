@@ -1,4 +1,4 @@
-const { pool } = require('../config/psqlConfig');
+const { pool } = require('../config/dbConfig');
 
 // 모든 회원 찾기
 const findAll = async () => {
