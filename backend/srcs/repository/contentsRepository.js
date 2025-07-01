@@ -1,18 +1,24 @@
 const { pool } = require('../config/psqlConfig');
 const storageRepository = require('./storageRepository');
 
-// 미디어 배열의 만료된 SAS URL을 재생성하는 헬퍼 함수
-const refreshExpiredSasUrls = async (mediaArray) => {
-	if (!Array.isArray(mediaArray) || mediaArray.length === 0) {
-		return mediaArray;
+// 미디어 배열의 만료된 SAS URL을 재생성하는 헬퍼 함수 (DB 업데이트 후 재조회)
+const refreshExpiredSasUrls = async (contentIds) => {
+	if (!Array.isArray(contentIds) || contentIds.length === 0) {
+		return [];
 	}
 	
-	const expiredMedia = mediaArray.filter(media => 
+	// 현재 미디어 정보 조회
+	const { rows: currentMedia } = await pool.query(
+		'SELECT * FROM media WHERE content_id = ANY($1) ORDER BY content_id, id ASC',
+		[contentIds]
+	);
+	
+	const expiredMedia = currentMedia.filter(media => 
 		storageRepository.isSasUrlExpired(media.file_url)
 	);
 	
 	if (expiredMedia.length === 0) {
-		return mediaArray; // 만료된 URL이 없으면 그대로 반환
+		return currentMedia; // 만료된 URL이 없으면 그대로 반환
 	}
 	
 	console.log(`${expiredMedia.length}개의 만료된 SAS URL 발견, 재생성 중...`);
@@ -41,110 +47,128 @@ const refreshExpiredSasUrls = async (mediaArray) => {
 			console.warn(`${regenerateResult.failed.length}개의 SAS URL 재생성 실패:`, regenerateResult.failed);
 		}
 		
+		// DB 업데이트 후 최신 데이터 재조회
+		const { rows: updatedMedia } = await pool.query(
+			'SELECT * FROM media WHERE content_id = ANY($1) ORDER BY content_id, id ASC',
+			[contentIds]
+		);
+		
+		return updatedMedia;
+		
 	} catch (error) {
 		await client.query('ROLLBACK');
 		console.error('SAS URL DB 업데이트 실패:', error);
+		return currentMedia; // 실패 시 원본 데이터 반환
 	} finally {
 		client.release();
 	}
-	
-	// 업데이트된 미디어 배열 반환
-	return mediaArray.map(media => {
-		const updatedUrl = regenerateResult.success.find(result => result.old === media.file_url);
-		return updatedUrl ? { ...media, file_url: updatedUrl.new } : media;
-	});
 };
 
 // 모든 게시물을 미디어와 함께 찾기
 const findAll = async () => {
 	const { rows } = await pool.query(`
 		SELECT 
-			c.*,
-			COALESCE(
-				JSON_AGG(
-					JSON_BUILD_OBJECT(
-						'id', m.id,
-						'file_url', m.file_url,
-						'created_at', m.created_at,
-						'updated_at', m.updated_at
-					)
-				) FILTER (WHERE m.id IS NOT NULL), 
-				'[]'::json
-			) as media
+			c.*
 		FROM contents c
-		LEFT JOIN media m ON c.id = m.content_id
-		GROUP BY c.id
 		ORDER BY c.id ASC
 	`);
 	
-	// 각 게시물의 만료된 SAS URL 갱신
-	for (const row of rows) {
-		row.media = await refreshExpiredSasUrls(row.media);
+	if (rows.length === 0) {
+		return rows;
 	}
 	
-	return rows;
+	// 모든 콘텐츠 ID 추출
+	const contentIds = rows.map(row => row.id);
+	
+	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
+	const updatedMedia = await refreshExpiredSasUrls(contentIds);
+	
+	// 콘텐츠별로 미디어 그룹화
+	const mediaByContentId = {};
+	updatedMedia.forEach(media => {
+		if (!mediaByContentId[media.content_id]) {
+			mediaByContentId[media.content_id] = [];
+		}
+		mediaByContentId[media.content_id].push(media);
+	});
+	
+	// 각 콘텐츠에 미디어 정보 추가
+	return rows.map(row => ({
+		...row,
+		media: mediaByContentId[row.id] || []
+	}));
 };
 
 // 특정 게시물 타입으로 미디어와 함께 찾기 (qna, community)
 const findByContentType = async (content_type) => {
 	const { rows } = await pool.query(`
 		SELECT 
-			c.*,
-			COALESCE(
-				JSON_AGG(
-					JSON_BUILD_OBJECT(
-						'id', m.id,
-						'file_url', m.file_url,
-						'created_at', m.created_at,
-						'updated_at', m.updated_at
-					)
-				) FILTER (WHERE m.id IS NOT NULL), 
-				'[]'::json
-			) as media
+			c.*
 		FROM contents c
-		LEFT JOIN media m ON c.id = m.content_id
 		WHERE c.content_type = $1
-		GROUP BY c.id
 		ORDER BY c.id ASC
 	`, [content_type]);
 	
-	// 각 게시물의 만료된 SAS URL 갱신
-	for (const row of rows) {
-		row.media = await refreshExpiredSasUrls(row.media);
+	if (rows.length === 0) {
+		return rows;
 	}
 	
-	return rows;
+	// 모든 콘텐츠 ID 추출
+	const contentIds = rows.map(row => row.id);
+	
+	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
+	const updatedMedia = await refreshExpiredSasUrls(contentIds);
+	
+	// 콘텐츠별로 미디어 그룹화
+	const mediaByContentId = {};
+	updatedMedia.forEach(media => {
+		if (!mediaByContentId[media.content_id]) {
+			mediaByContentId[media.content_id] = [];
+		}
+		mediaByContentId[media.content_id].push(media);
+	});
+	
+	// 각 콘텐츠에 미디어 정보 추가
+	return rows.map(row => ({
+		...row,
+		media: mediaByContentId[row.id] || []
+	}));
 };
 
 // 특정 회원의 게시물을 미디어와 함께 찾기
 const findByMemberId = async (member_id) => {
 	const { rows } = await pool.query(`
 		SELECT 
-			c.*,
-			COALESCE(
-				JSON_AGG(
-					JSON_BUILD_OBJECT(
-						'id', m.id,
-						'file_url', m.file_url,
-						'created_at', m.created_at,
-						'updated_at', m.updated_at
-					)
-				) FILTER (WHERE m.id IS NOT NULL), 
-				'[]'::json
-			) as media
+			c.*
 		FROM contents c
-		LEFT JOIN media m ON c.id = m.content_id
 		WHERE c.member_id = $1
-		GROUP BY c.id
 		ORDER BY c.id ASC
 	`, [member_id]);
 	
-	// 각 게시물의 만료된 SAS URL 갱신
-	for (const row of rows) {
-		row.media = await refreshExpiredSasUrls(row.media);
+	if (rows.length === 0) {
+		return rows;
 	}
 	
-	return rows;
+	// 모든 콘텐츠 ID 추출
+	const contentIds = rows.map(row => row.id);
+	
+	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
+	const updatedMedia = await refreshExpiredSasUrls(contentIds);
+	
+	// 콘텐츠별로 미디어 그룹화
+	const mediaByContentId = {};
+	updatedMedia.forEach(media => {
+		if (!mediaByContentId[media.content_id]) {
+			mediaByContentId[media.content_id] = [];
+		}
+		mediaByContentId[media.content_id].push(media);
+	});
+	
+	// 각 콘텐츠에 미디어 정보 추가
+	return rows.map(row => ({
+		...row,
+		media: mediaByContentId[row.id] || []
+	}));
 };
 
 // 특정 게시물을 미디어와 함께 생성 (트랜잭션 사용)
@@ -215,31 +239,25 @@ const create = async (contentData) => {
 // 특정 게시물을 미디어와 함께 ID로 찾기
 const findById = async (id) => {
 	const { rows } = await pool.query(`
-		SELECT 
-			c.*,
-			COALESCE(
-				JSON_AGG(
-					JSON_BUILD_OBJECT(
-						'id', m.id,
-						'file_url', m.file_url,
-						'created_at', m.created_at,
-						'updated_at', m.updated_at
-					)
-				) FILTER (WHERE m.id IS NOT NULL), 
-				'[]'::json
-			) as media
+		SELECT c.*
 		FROM contents c
-		LEFT JOIN media m ON c.id = m.content_id
 		WHERE c.id = $1
-		GROUP BY c.id
 	`, [id]);
 	
-	if (rows.length > 0) {
-		// 만료된 SAS URL 갱신
-		rows[0].media = await refreshExpiredSasUrls(rows[0].media);
+	if (rows.length === 0) {
+		return undefined;
 	}
 	
-	return rows[0];
+	const content = rows[0];
+	
+	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
+	const updatedMedia = await refreshExpiredSasUrls([content.id]);
+	
+	// 콘텐츠에 미디어 정보 추가
+	return {
+		...content,
+		media: updatedMedia
+	};
 };
 
 // 특정 게시물 정보를 미디어와 함께 업데이트 (Storage + DB 분산 트랜잭션)
@@ -415,10 +433,11 @@ const deleteById = async (id, member_id) => {
 
 // 특정 콘텐츠의 미디어만 조회
 const findMediaByContentId = async (content_id) => {
-	const { rows } = await pool.query('SELECT * FROM media WHERE content_id = $1 ORDER BY id ASC', [content_id]);
+	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
+	const updatedMedia = await refreshExpiredSasUrls([content_id]);
 	
-	// 만료된 SAS URL 갱신
-	return await refreshExpiredSasUrls(rows);
+	// 해당 콘텐츠의 미디어만 필터링해서 반환
+	return updatedMedia.filter(media => media.content_id === parseInt(content_id));
 };
 
 // 특정 미디어 삭제 (Storage + DB)
