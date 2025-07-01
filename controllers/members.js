@@ -88,8 +88,12 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-	const member = await membersServices.create(req.body);
-	res.status(201).json(member);
+	try {
+		const member = await membersServices.create(req.body);
+		res.status(201).json(member);
+	} catch (error) {
+		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+	}
 });
 
 // "내" 정보 조회 API (토큰 기반)

@@ -30,6 +30,8 @@ const findById = async (id) => {
 const create = async (memberData) => {
 	const { user_id, name, email, password } = memberData;
 
+	console.log(user_id, name, email, password);
+
 	const { rows } = await pool.query(
 		'INSERT INTO members (user_id, name, email, password) VALUES ($1, $2, $3, $4) RETURNING *',
 		[user_id, name, email, password]
