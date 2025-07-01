@@ -1,11 +1,12 @@
 const swaggerJsdoc = require('swagger-jsdoc');
 const { Member, MemberView } = require('./memberSchemas');
 const { 
-	ContentSearchRequest, 
+	MediaResponse,
+	ContentWithMediaResponse,
 	ContentCreateRequest, 
 	ContentUpdateRequest, 
-	ContentDeleteRequest, 
-	ContentResponse
+	ContentUpdateWithMediaRequest,
+	ErrorResponse
 } = require('./contentSchemas');
 
 const options = {
@@ -51,11 +52,13 @@ const options = {
 					required: ['title', 'date'],
 				},
 
-				ContentSearchRequest: ContentSearchRequest,
+				// Content Schemas
+				MediaResponse: MediaResponse,
+				ContentWithMediaResponse: ContentWithMediaResponse,
 				ContentCreateRequest: ContentCreateRequest,
 				ContentUpdateRequest: ContentUpdateRequest,
-				ContentDeleteRequest: ContentDeleteRequest,
-				ContentResponse: ContentResponse,
+				ContentUpdateWithMediaRequest: ContentUpdateWithMediaRequest,
+				ErrorResponse: ErrorResponse,
 
 				Member: Member,
 				MemberView: MemberView,
@@ -87,6 +90,14 @@ const options = {
 			externalDocs: {
 				description: '데이터 모델 설명',
 				url: 'https://example.com/wiki/plan',
+			},
+		},
+		{
+			name: 'Contents',
+			description: '커뮤니티 게시물 및 Q&A **콘텐츠(Contents)** 관리 API',
+			externalDocs: {
+				description: '미디어 파일 포함 콘텐츠 관리',
+				url: 'https://example.com/wiki/contents',
 			},
 		},
 		{
