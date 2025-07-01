@@ -12,6 +12,9 @@ if (process.env.NODE_ENV === 'production') {
 	console.log('🏭 Production DB: Supabase 연결');
 	poolConfig = {
 		connectionString: process.env.SUPABASE_URL,
+		ssl: {
+			rejectUnauthorized: false
+		}
 	};
 } else {
 	// 개발 환경: 로컬 PostgreSQL 사용
