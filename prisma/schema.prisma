@@ -1,0 +1,220 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "darwin-arm64", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("SUPABASE_DATABASE_URL")
+  directUrl = env("SUPABASE_DIRECT_URL")
+}
+
+// User 테이블
+model User {
+  id            BigInt   @id @default(autoincrement())
+  loginId       String   @unique @map("login_id")
+  password      String
+  nickname      String
+  statusNote    String?  @map("status_note")
+  profile       String?
+  refreshToken  String?  @map("refresh_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  contents      Content[]
+  comments      Comment[]
+  plans         Plan[]
+  pets          Pet[]
+  contentLikes  ContentLike[]
+  commentLikes  CommentLike[]
+
+  @@map("users")
+}
+
+// Content 테이블
+model Content {
+  id            BigInt      @id @default(autoincrement())
+  userId        BigInt      @map("user_id")
+  contentType   String      @map("content_type")
+  body          String?
+  likesCount    Int         @default(0) @map("likes_count")
+  commentsCount Int         @default(0) @map("comments_count")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comments      Comment[]
+  media         Media[]
+  contentLikes  ContentLike[]
+
+  @@map("contents")
+}
+
+// Comment 테이블
+model Comment {
+  id          BigInt   @id @default(autoincrement())
+  userId      BigInt?  @map("user_id")
+  contentId   BigInt   @map("content_id")
+  body        String
+  likesCount  Int      @default(0) @map("likes_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  content      Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  commentLikes CommentLike[]
+
+  @@map("comments")
+}
+
+// Media 테이블
+model Media {
+  id        BigInt   @id @default(autoincrement())
+  contentId BigInt   @map("content_id")
+  fileUrl   String   @map("file_url")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}
+
+// ContentLike 테이블 (콘텐츠 좋아요)
+model ContentLike {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  contentId BigInt   @map("content_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contentId])
+  @@map("content_likes")
+}
+
+// CommentLike 테이블 (댓글 좋아요)
+model CommentLike {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  commentId BigInt   @map("comment_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, commentId])
+  @@map("comment_likes")
+}
+
+// Plan 테이블
+model Plan {
+  id        BigInt    @id @default(autoincrement())
+  userId    BigInt    @map("user_id")
+  title     String
+  date      DateTime  @db.Date
+  time      DateTime? @db.Time
+  isChecked Boolean   @default(false) @map("is_checked")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missions Mission[]
+
+  @@map("plans")
+}
+
+// Pet 테이블
+model Pet {
+  id          BigInt    @id @default(autoincrement())
+  userId      BigInt    @map("user_id")
+  name        String
+  birthDate   DateTime? @map("birth_date") @db.Date
+  gender      String?
+  isNeutering Boolean   @default(false) @map("is_neutering")
+  profile     String?
+  species     String?
+  type        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  memories Memory[]
+
+  @@map("pets")
+}
+
+// Mission 테이블
+model Mission {
+  id           BigInt   @id @default(autoincrement())
+  planId       BigInt   @map("plan_id")
+  title        String
+  description  String?
+  missionOrder Int?     @map("mission_order")
+  isDone       Boolean  @default(false) @map("is_done")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@map("missions")
+}
+
+// Memory 테이블
+model Memory {
+  id        BigInt   @id @default(autoincrement())
+  petId     BigInt   @map("pet_id")
+  body      String?
+  date      DateTime? @db.Date
+  count     Int?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  pet  Pet               @relation(fields: [petId], references: [id], onDelete: Cascade)
+  tags MemoryTagMap[]
+
+  @@map("memories")
+}
+
+// Tag 테이블
+model Tag {
+  id        BigInt   @id @default(autoincrement())
+  name      String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  memories MemoryTagMap[]
+
+  @@map("tags")
+}
+
+// MemoryTagMap 테이블 (다대다 관계)
+model MemoryTagMap {
+  id       BigInt   @id @default(autoincrement())
+  memoryId BigInt   @map("memory_id")
+  tagId    BigInt   @map("tag_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([memoryId, tagId])
+  @@map("memory_tag_maps")
+} 
