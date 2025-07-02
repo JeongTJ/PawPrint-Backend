@@ -10,9 +10,9 @@ const fs = require('fs');
 const path = require('path');
 
 // BigInt 직렬화 처리
-BigInt.prototype.toJSON = function() {
-	return this.toString();
-};
+// BigInt.prototype.toJSON = function() {
+// 	return this.toString();
+// };
 
 const app  = express();
 const port = process.env.PORT || 8000;
