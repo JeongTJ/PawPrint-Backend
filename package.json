@@ -21,6 +21,7 @@
     "@azure/storage-blob": "^12.27.0",
     "@prisma/client": "^5.22.0",
     "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "encrypt": "^0.0.1",
     "express": "^5.1.0",

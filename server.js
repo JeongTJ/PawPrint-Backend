@@ -1,6 +1,6 @@
 const express = require('express');
 // const morgan  = require('morgan');
-// const cors    = require('cors');
+const cors    = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
 const { connectDatabase, disconnectDatabase } = require('./config/dbConfig');
@@ -28,6 +28,34 @@ if (process.env.NODE_ENV === 'production') {
 // ── 공통 미들웨어
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// ── CORS 설정 (Flutter 웹 앱 지원)
+const corsOptions = {
+  origin: function (origin, callback) {
+    // 개발 환경에서는 모든 origin 허용
+    if (process.env.NODE_ENV === 'development') {
+      return callback(null, true);
+    }
+    
+    // 프로덕션에서는 특정 도메인만 허용
+    const allowedOrigins = [
+      'https://your-flutter-web-domain.com',  // 실제 Flutter 웹 도메인으로 변경
+      'http://localhost:3000',  // Flutter 웹 개발 서버
+      'http://localhost:8080',  // Flutter 웹 대체 포트
+    ];
+    
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    callback(new Error('CORS 정책에 의해 차단되었습니다.'));
+  },
+  credentials: true,  // 쿠키 및 인증 헤더 허용
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
 
 // ── 요청 로깅 미들웨어 (가장 먼저 적용)
 app.use(requestLoggingMiddleware);

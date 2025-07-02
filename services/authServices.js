@@ -23,13 +23,23 @@ const generateTokens = async (id) => {
 	}
 
 	const refreshToken = jwt.sign(
-		{ id: parseInt(user.id, 10), type: 'refresh' }, 
+		{ 
+			id: parseInt(user.id, 10), 
+			loginId: user.loginId || user.user_id,
+			nickname: user.nickname || user.name,
+			type: 'refresh' 
+		}, 
 		process.env.JWT_SECRET, 
 		{ expiresIn: '1d',}
 	);
 
 	const accessToken = jwt.sign(
-		{ id: parseInt(user.id, 10), type: 'access'}, 
+		{ 
+			id: parseInt(user.id, 10), 
+			loginId: user.loginId || user.user_id,
+			nickname: user.nickname || user.name,
+			type: 'access'
+		}, 
 		process.env.JWT_SECRET, 
 		{ expiresIn: '1h',}
 	);
@@ -62,13 +72,23 @@ const refreshToken = async (refreshToken) => {
 	}
 	
 	const newRefreshToken = jwt.sign(
-		{ id: parseInt(user.id, 10), type: 'refresh' }, 
+		{ 
+			id: parseInt(user.id, 10), 
+			loginId: user.loginId || user.user_id,
+			nickname: user.nickname || user.name,
+			type: 'refresh' 
+		}, 
 		process.env.JWT_SECRET,
 		{ expiresIn: '1d' }
 	);
 	
 	const newAccessToken = jwt.sign(
-		{ id: parseInt(user.id, 10), type: 'access' }, 
+		{ 
+			id: parseInt(user.id, 10), 
+			loginId: user.loginId || user.user_id,
+			nickname: user.nickname || user.name,
+			type: 'access' 
+		}, 
 		process.env.JWT_SECRET,
 		{ expiresIn: '1d' }
 	);
