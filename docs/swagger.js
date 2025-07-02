@@ -21,12 +21,12 @@ const options = {
 			version: '1.0.0',
 			description: 'PawPrint 백엔드 OpenAPI 문서',
 		},
-		servers: [
-			{
-				url: 'http://localhost:8000',
-				description: '로컬 개발 서버',
-			},
-		],
+		// servers: [
+		// 	{
+		// 		url: 'http://localhost:8000',
+		// 		description: '로컬 개발 서버',
+		// 	},
+		// ],
 		components: {
 			securitySchemes: {
 				bearerAuth: {
