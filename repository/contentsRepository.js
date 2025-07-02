@@ -509,6 +509,199 @@ const regenerateSasUrlsForContent = async (contentId) => {
 	};
 };
 
+// ==================== 좋아요 관련 함수들 ====================
+
+// 좋아요 추가
+const addLike = async (userId, contentId) => {
+	return await prisma.contentLike.create({
+		data: {
+			userId: BigInt(userId),
+			contentId: BigInt(contentId)
+		},
+		include: {
+			user: {
+				select: {
+					id: true,
+					loginId: true,
+					nickname: true,
+					profile: true
+				}
+			}
+		}
+	});
+};
+
+// 좋아요 제거
+const removeLike = async (userId, contentId) => {
+	return await prisma.contentLike.delete({
+		where: {
+			userId_contentId: {
+				userId: BigInt(userId),
+				contentId: BigInt(contentId)
+			}
+		}
+	});
+};
+
+// 사용자가 특정 컨텐츠에 좋아요했는지 확인
+const isLikedByUser = async (userId, contentId) => {
+	const like = await prisma.contentLike.findUnique({
+		where: {
+			userId_contentId: {
+				userId: BigInt(userId),
+				contentId: BigInt(contentId)
+			}
+		}
+	});
+	return !!like;
+};
+
+// 특정 컨텐츠의 좋아요 목록 조회
+const getLikesByContentId = async (contentId) => {
+	return await prisma.contentLike.findMany({
+		where: { contentId: BigInt(contentId) },
+		include: {
+			user: {
+				select: {
+					id: true,
+					loginId: true,
+					nickname: true,
+					profile: true
+				}
+			}
+		},
+		orderBy: { createdAt: 'desc' }
+	});
+};
+
+// 사용자가 좋아요한 컨텐츠 목록 조회
+const getUserLikedContents = async (userId) => {
+	const likes = await prisma.contentLike.findMany({
+		where: { userId: BigInt(userId) },
+		include: {
+			content: {
+				include: {
+					media: {
+						orderBy: { id: 'asc' }
+					},
+					user: {
+						select: {
+							id: true,
+							loginId: true,
+							nickname: true,
+							profile: true
+						}
+					}
+				}
+			}
+		},
+		orderBy: { createdAt: 'desc' }
+	});
+	
+	return likes.map(like => like.content);
+};
+
+// ==================== 댓글 관련 함수들 ====================
+
+// 댓글 추가
+const addComment = async (userId, contentId, body) => {
+	return await prisma.comment.create({
+		data: {
+			userId: BigInt(userId),
+			contentId: BigInt(contentId),
+			body
+		},
+		include: {
+			user: {
+				select: {
+					id: true,
+					loginId: true,
+					nickname: true,
+					profile: true
+				}
+			}
+		}
+	});
+};
+
+// 특정 컨텐츠의 댓글 목록 조회
+const getCommentsByContentId = async (contentId) => {
+	return await prisma.comment.findMany({
+		where: { contentId: BigInt(contentId) },
+		include: {
+			user: {
+				select: {
+					id: true,
+					loginId: true,
+					nickname: true,
+					profile: true
+				}
+			}
+		},
+		orderBy: { createdAt: 'asc' }
+	});
+};
+
+// 사용자가 작성한 댓글 목록 조회
+const getUserComments = async (userId) => {
+	return await prisma.comment.findMany({
+		where: { userId: BigInt(userId) },
+		include: {
+			user: {
+				select: {
+					id: true,
+					loginId: true,
+					nickname: true,
+					profile: true
+				}
+			},
+			content: {
+				select: {
+					id: true,
+					contentType: true,
+					body: true,
+					createdAt: true
+				}
+			}
+		},
+		orderBy: { createdAt: 'desc' }
+	});
+};
+
+// 댓글 수정
+const updateComment = async (commentId, userId, body) => {
+	return await prisma.comment.update({
+		where: { 
+			id: BigInt(commentId),
+			userId: BigInt(userId) // 작성자만 수정 가능
+		},
+		data: {
+			body,
+			updatedAt: new Date()
+		},
+		include: {
+			user: {
+				select: {
+					id: true,
+					loginId: true,
+					nickname: true,
+					profile: true
+				}
+			}
+		}
+	});
+};
+
+// 댓글 삭제
+const deleteComment = async (commentId, userId) => {
+	return await prisma.comment.delete({
+		where: { 
+			id: BigInt(commentId),
+			userId: BigInt(userId) // 작성자만 삭제 가능
+		}
+	});
+};
+
 module.exports = {
 	findAll,
 	findByContentType,
@@ -521,5 +714,17 @@ module.exports = {
 	deleteById,
 	findMediaByContentId,
 	deleteMediaById,
-	regenerateSasUrlsForContent
+	regenerateSasUrlsForContent,
+	// 좋아요 관련
+	addLike,
+	removeLike,
+	isLikedByUser,
+	getLikesByContentId,
+	getUserLikedContents,
+	// 댓글 관련
+	addComment,
+	getCommentsByContentId,
+	getUserComments,
+	updateComment,
+	deleteComment
 };

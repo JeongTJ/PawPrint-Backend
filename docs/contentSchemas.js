@@ -14,28 +14,28 @@ const ContentWithMediaResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
-		user_id: { type: 'integer', example: 5 },
-		content_type: { type: 'string', enum: ['qna', 'community'], example: 'community' },
+		userId: { type: 'integer', example: 5 },
+		contentType: { type: 'string', enum: ['qna', 'community'], example: 'community' },
 		body: { type: 'string', example: '우리 강아지가 오늘 처음으로 바다를 봤어요! 🐕🌊' },
-		likes_count: { type: 'integer', example: 12 },
-		comments_count: { type: 'integer', example: 3 },
-		created_at: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
-		updated_at: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+		likesCount: { type: 'integer', example: 12 },
+		commentsCount: { type: 'integer', example: 3 },
+		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 		media: {
 			type: 'array',
 			items: MediaResponse,
 			example: [
 				{
 					id: 1,
-					file_url: 'https://storage.azure.com/images/dog_beach_1.jpg?sasToken=...',
-					created_at: '2024-01-15T10:30:05.000Z',
-					updated_at: '2024-01-15T10:30:05.000Z'
+					fileUrl: 'https://storage.azure.com/images/dog_beach_1.jpg?sasToken=...',
+					createdAt: '2024-01-15T10:30:05.000Z',
+					updatedAt: '2024-01-15T10:30:05.000Z'
 				},
 				{
 					id: 2,
-					file_url: 'https://storage.azure.com/images/dog_beach_2.jpg?sasToken=...',
-					created_at: '2024-01-15T10:30:06.000Z',
-					updated_at: '2024-01-15T10:30:06.000Z'
+					fileUrl: 'https://storage.azure.com/images/dog_beach_2.jpg?sasToken=...',
+					createdAt: '2024-01-15T10:30:06.000Z',
+					updatedAt: '2024-01-15T10:30:06.000Z'
 				}
 			]
 		},
@@ -47,13 +47,13 @@ const QnaContentResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 2 },
-		user_id: { type: 'integer', example: 3 },
-		content_type: { type: 'string', example: 'qna' },
+		userId: { type: 'integer', example: 3 },
+		contentType: { type: 'string', example: 'qna' },
 		body: { type: 'string', example: '강아지가 밥을 안 먹어요. 어떻게 해야 할까요?' },
-		likes_count: { type: 'integer', example: 5 },
-		comments_count: { type: 'integer', example: 8 },
-		created_at: { type: 'string', format: 'date-time', example: '2024-01-15T11:00:00.000Z' },
-		updated_at: { type: 'string', format: 'date-time', example: '2024-01-15T11:00:00.000Z' },
+		likesCount: { type: 'integer', example: 5 },
+		commentsCount: { type: 'integer', example: 8 },
+		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T11:00:00.000Z' },
+		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T11:00:00.000Z' },
 		media: {
 			type: 'array',
 			items: MediaResponse,
@@ -67,22 +67,22 @@ const CommunityContentResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
-		user_id: { type: 'integer', example: 5 },
-		content_type: { type: 'string', example: 'community' },
+		userId: { type: 'integer', example: 5 },
+		contentType: { type: 'string', example: 'community' },
 		body: { type: 'string', example: '우리 강아지 산책 사진들! 🐕' },
-		likes_count: { type: 'integer', example: 12 },
-		comments_count: { type: 'integer', example: 3 },
-		created_at: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
-		updated_at: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+		likesCount: { type: 'integer', example: 12 },
+		commentsCount: { type: 'integer', example: 3 },
+		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 		media: {
 			type: 'array',
 			items: MediaResponse,
 			example: [
 				{
 					id: 1,
-					file_url: 'https://storage.azure.com/images/dog1.jpg?sasToken=...',
-					created_at: '2024-01-15T10:30:05.000Z',
-					updated_at: '2024-01-15T10:30:05.000Z'
+					fileUrl: 'https://storage.azure.com/images/dog1.jpg?sasToken=...',
+					createdAt: '2024-01-15T10:30:05.000Z',
+					updatedAt: '2024-01-15T10:30:05.000Z'
 				}
 			]
 		}
@@ -93,7 +93,7 @@ const CommunityContentResponse = {
 const ContentCreateRequest = {
 	type: 'object',
 	properties: {
-		content_type: {
+		contentType: {
 			type: 'string',
 			enum: ['qna', 'community'],
 			example: 'community',
@@ -114,7 +114,7 @@ const ContentCreateRequest = {
 			description: '이미지 파일들 (최대 5개, QNA 게시물은 첨부 불가)'
 		}
 	},
-	required: ['content_type', 'body']
+	required: ['contentType', 'body']
 };
 
 // 컨텐츠 텍스트 수정 요청

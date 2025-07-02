@@ -131,5 +131,69 @@ router.get('/:userId', authMiddleware, async (req, res) => {
 	}
 });
 
+// ==================== 사용자별 좋아요/댓글 조회 API ====================
+
+/**
+ * @openapi
+ * /api/users/me/likes:
+ *   get:
+ *     summary: 내가 좋아요한 게시물 목록 조회
+ *     tags: [users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 내가 좋아요한 게시물 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ContentWithMediaResponse'
+ * 
+ * /api/users/me/comments:
+ *   get:
+ *     summary: 내가 작성한 댓글 목록 조회
+ *     tags: [users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 내가 작성한 댓글 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
+
+// GET /api/users/me/likes - 내가 좋아요한 게시물 목록 조회
+router.get('/me/likes', authMiddleware, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const contentsServices = require('../services/contentsServices');
+		
+		const likedContents = await contentsServices.getUserLikedContents(userId);
+		res.json(likedContents);
+	} catch (error) {
+		console.error('좋아요한 게시물 조회 오류:', error);
+		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+	}
+});
+
+// GET /api/users/me/comments - 내가 작성한 댓글 목록 조회
+router.get('/me/comments', authMiddleware, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const contentsServices = require('../services/contentsServices');
+		
+		const userComments = await contentsServices.getUserComments(userId);
+		res.json(userComments);
+	} catch (error) {
+		console.error('내 댓글 목록 조회 오류:', error);
+		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+	}
+});
 
 module.exports = router; 

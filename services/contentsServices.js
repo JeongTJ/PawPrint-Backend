@@ -74,15 +74,15 @@ const findById = async (id) => {
 const create = async (contentData) => {
 	try {
 		// 입력 데이터 검증
-		const { userId, content_type, body } = contentData;
+		const { userId, contentType, body } = contentData;
 		
-		if (!userId || !content_type || !body) {
-			const error = new Error('필수 필드가 누락되었습니다. (userId, content_type, body)');
+		if (!userId || !contentType || !body) {
+			const error = new Error('필수 필드가 누락되었습니다. (userId, contentType, body)');
 			error.statusCode = 400;
 			throw error;
 		}
 		
-		if (!['qna', 'community'].includes(content_type)) {
+		if (!['qna', 'community'].includes(contentType)) {
 			const error = new Error('유효하지 않은 게시물 타입입니다. (qna, community만 허용)');
 			error.statusCode = 400;
 			throw error;
@@ -100,22 +100,22 @@ const create = async (contentData) => {
 const createWithMedia = async (contentData, mediaFiles = []) => {
 	try {
 		// 입력 데이터 검증
-		const { user_id, content_type, body } = contentData;
+		const { userId, contentType, body } = contentData;
 		
-		if (!user_id || !content_type || !body) {
-			const error = new Error('필수 필드가 누락되었습니다. (user_id, content_type, body)');
+		if (!userId || !contentType || !body) {
+			const error = new Error('필수 필드가 누락되었습니다. (userId, contentType, body)');
 			error.statusCode = 400;
 			throw error;
 		}
 		
-		if (!['qna', 'community'].includes(content_type)) {
+		if (!['qna', 'community'].includes(contentType)) {
 			const error = new Error('유효하지 않은 게시물 타입입니다. (qna, community만 허용)');
 			error.statusCode = 400;
 			throw error;
 		}
 		
 		// QNA 게시물에 이미지 첨부 시도 검증 (DB 트리거가 있지만 미리 체크)
-		if (content_type === 'qna' && mediaFiles && mediaFiles.length > 0) {
+		if (contentType === 'qna' && mediaFiles && mediaFiles.length > 0) {
 			const error = new Error('Q&A 게시물에는 이미지를 첨부할 수 없습니다.');
 			error.statusCode = 400;
 			throw error;
@@ -187,7 +187,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 		}
 		
 		// QNA 게시물에 이미지 첨부 시도 검증
-		if (existingContent.content_type === 'qna' && newMediaFiles && newMediaFiles.length > 0) {
+		if (existingContent.contentType === 'qna' && newMediaFiles && newMediaFiles.length > 0) {
 			const error = new Error('Q&A 게시물에는 이미지를 첨부할 수 없습니다.');
 			error.statusCode = 400;
 			throw error;
@@ -329,6 +329,242 @@ const findByType = async (content_type) => {
 	return await findByContentType(content_type);
 };
 
+// ==================== 좋아요 관련 서비스 ====================
+
+// 좋아요 토글 (좋아요/좋아요 취소)
+const toggleLike = async (userId, contentId) => {
+	try {
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		if (!contentId || isNaN(contentId)) {
+			const error = new Error('유효하지 않은 게시물 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		// 게시물 존재 확인
+		const content = await contentsRepository.findById(contentId);
+		if (!content) {
+			const error = new Error(`ID ${contentId}에 해당하는 게시물을 찾을 수 없습니다.`);
+			error.statusCode = 404;
+			throw error;
+		}
+		
+		// 이미 좋아요했는지 확인
+		const isLiked = await contentsRepository.isLikedByUser(userId, contentId);
+		
+		if (isLiked) {
+			// 좋아요 취소
+			await contentsRepository.removeLike(userId, contentId);
+			return { message: '좋아요가 취소되었습니다.', isLiked: false };
+		} else {
+			// 좋아요 추가
+			const like = await contentsRepository.addLike(userId, contentId);
+			return { message: '좋아요가 추가되었습니다.', isLiked: true, like };
+		}
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('좋아요 토글 중 오류:', error);
+		throw new Error('좋아요 처리에 실패했습니다.');
+	}
+};
+
+// 특정 컨텐츠의 좋아요 목록 조회
+const getContentLikes = async (contentId) => {
+	try {
+		if (!contentId || isNaN(contentId)) {
+			const error = new Error('유효하지 않은 게시물 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		// 게시물 존재 확인
+		const content = await contentsRepository.findById(contentId);
+		if (!content) {
+			const error = new Error(`ID ${contentId}에 해당하는 게시물을 찾을 수 없습니다.`);
+			error.statusCode = 404;
+			throw error;
+		}
+		
+		return await contentsRepository.getLikesByContentId(contentId);
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('게시물 좋아요 목록 조회 중 오류:', error);
+		throw new Error('좋아요 목록 조회에 실패했습니다.');
+	}
+};
+
+// 사용자가 좋아요한 컨텐츠 목록 조회
+const getUserLikedContents = async (userId) => {
+	try {
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		return await contentsRepository.getUserLikedContents(userId);
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('사용자 좋아요 컨텐츠 조회 중 오류:', error);
+		throw new Error('좋아요한 게시물 조회에 실패했습니다.');
+	}
+};
+
+// ==================== 댓글 관련 서비스 ====================
+
+// 댓글 생성
+const createComment = async (userId, contentId, body) => {
+	try {
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		if (!contentId || isNaN(contentId)) {
+			const error = new Error('유효하지 않은 게시물 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		if (!body || body.trim() === '') {
+			const error = new Error('댓글 내용을 입력해주세요.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		// 게시물 존재 확인
+		const content = await contentsRepository.findById(contentId);
+		if (!content) {
+			const error = new Error(`ID ${contentId}에 해당하는 게시물을 찾을 수 없습니다.`);
+			error.statusCode = 404;
+			throw error;
+		}
+		
+		return await contentsRepository.addComment(userId, contentId, body.trim());
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('댓글 생성 중 오류:', error);
+		throw new Error('댓글 작성에 실패했습니다.');
+	}
+};
+
+// 특정 컨텐츠의 댓글 목록 조회 
+const getContentComments = async (contentId) => {
+	try {
+		if (!contentId || isNaN(contentId)) {
+			const error = new Error('유효하지 않은 게시물 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		// 게시물 존재 확인
+		const content = await contentsRepository.findById(contentId);
+		if (!content) {
+			const error = new Error(`ID ${contentId}에 해당하는 게시물을 찾을 수 없습니다.`);
+			error.statusCode = 404;
+			throw error;
+		}
+		
+		return await contentsRepository.getCommentsByContentId(contentId);
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('게시물 댓글 목록 조회 중 오류:', error);
+		throw new Error('댓글 목록 조회에 실패했습니다.');
+	}
+};
+
+// 사용자가 작성한 댓글 목록 조회
+const getUserComments = async (userId) => {
+	try {
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		return await contentsRepository.getUserComments(userId);
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('사용자 댓글 목록 조회 중 오류:', error);
+		throw new Error('댓글 목록 조회에 실패했습니다.');
+	}
+};
+
+// 댓글 수정
+const updateComment = async (commentId, userId, body) => {
+	try {
+		if (!commentId || isNaN(commentId)) {
+			const error = new Error('유효하지 않은 댓글 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		if (!body || body.trim() === '') {
+			const error = new Error('댓글 내용을 입력해주세요.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		return await contentsRepository.updateComment(commentId, userId, body.trim());
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('댓글 수정 중 오류:', error);
+		
+		// Prisma 오류에서 권한 관련 에러 처리
+		if (error.message.includes('Record to update not found')) {
+			const permissionError = new Error('댓글을 찾을 수 없거나 수정 권한이 없습니다.');
+			permissionError.statusCode = 403;
+			throw permissionError;
+		}
+		
+		throw new Error('댓글 수정에 실패했습니다.');
+	}
+};
+
+// 댓글 삭제
+const deleteComment = async (commentId, userId) => {
+	try {
+		if (!commentId || isNaN(commentId)) {
+			const error = new Error('유효하지 않은 댓글 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+		
+		await contentsRepository.deleteComment(commentId, userId);
+		return { message: '댓글이 삭제되었습니다.' };
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('댓글 삭제 중 오류:', error);
+		
+		// Prisma 오류에서 권한 관련 에러 처리
+		if (error.message.includes('Record to delete does not exist')) {
+			const permissionError = new Error('댓글을 찾을 수 없거나 삭제 권한이 없습니다.');
+			permissionError.statusCode = 403;
+			throw permissionError;
+		}
+		
+		throw new Error('댓글 삭제에 실패했습니다.');
+	}
+};
+
 module.exports = { 
 	// 기본 CRUD
 	findAll, 
@@ -344,6 +580,18 @@ module.exports = {
 	updateWithMedia,
 	findMediaByContentId,
 	deleteMediaById,
+	
+	// 좋아요 관련
+	toggleLike,
+	getContentLikes,
+	getUserLikedContents,
+	
+	// 댓글 관련
+	createComment,
+	getContentComments,
+	getUserComments,
+	updateComment,
+	deleteComment,
 	
 	// 하위 호환성
 	findByType,
