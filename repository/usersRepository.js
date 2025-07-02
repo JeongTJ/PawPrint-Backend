@@ -117,35 +117,81 @@ const existsByLoginId = async (loginId) => {
 // ========== 로그인 플로우 관련 함수들 ==========
 
 // 회원가입: 사용자와 반려동물 정보 동시 생성 (트랜잭션)
-const createUserWithPet = async (userData, petData) => {
-	const result = await prisma.$transaction(async (tx) => {
-		// 1. 사용자 생성
-		const newUser = await tx.user.create({
-			data: {
-				loginId: userData.loginId,
-				password: userData.password,
-				nickname: userData.nickname,
-				statusNote: userData.statusNote,
-				profile: userData.profile,
-			},
-			select: publicUserSelect
+const createUserWithPet = async (userData, petData, files = {}) => {
+	const storageRepository = require('./storageRepository');
+	let uploadedFiles = [];
+	
+	try {
+		// 1. 먼저 파일들을 Storage에 업로드
+		if (files.profileImage) {
+			const file = files.profileImage;
+			userData.profile = await storageRepository.uploadFile(
+				file.buffer, 
+				file.originalname, 
+				file.mimetype, 
+				'profiles'
+			);
+			uploadedFiles.push(userData.profile);
+		}
+
+		if (files.petProfileImage) {
+			const file = files.petProfileImage;
+			petData.profile = await storageRepository.uploadFile(
+				file.buffer, 
+				file.originalname, 
+				file.mimetype, 
+				'pets'
+			);
+			uploadedFiles.push(petData.profile);
+		}
+
+		// 2. DB 트랜잭션으로 사용자와 반려동물 생성
+		const result = await prisma.$transaction(async (tx) => {
+			// 사용자 생성
+			const newUser = await tx.user.create({
+				data: {
+					loginId: userData.loginId,
+					password: userData.password,
+					nickname: userData.nickname,
+					statusNote: userData.statusNote,
+					profile: userData.profile,
+				},
+				select: publicUserSelect
+			});
+
+			// 반려동물 생성
+			const newPet = await tx.pet.create({
+				data: {
+					userId: newUser.id,
+					name: petData.name,
+					birthDate: petData.birthDate,
+					gender: petData.gender,
+					profile: petData.profile,
+				}
+			});
+
+			return { user: newUser, pet: newPet };
 		});
 
-		// 2. 반려동물 생성
-		const newPet = await tx.pet.create({
-			data: {
-				userId: newUser.id,
-				name: petData.name,
-				birthDate: petData.birthDate,
-				gender: petData.gender,
-				profile: petData.profile,
+		console.log(`✅ 사용자 및 반려동물 생성 완료 (User ID: ${result.user.id})`);
+		return result;
+		
+	} catch (error) {
+		console.error('회원가입 실패:', error);
+		
+		// DB 저장 실패 시 업로드된 파일들 정리
+		if (uploadedFiles.length > 0) {
+			console.log('업로드된 파일들 정리 중...');
+			try {
+				await storageRepository.deleteMultipleFiles(uploadedFiles);
+				console.log('업로드된 파일들 정리 완료');
+			} catch (cleanupError) {
+				console.error('파일 정리 실패:', cleanupError);
 			}
-		});
-
-		return { user: newUser, pet: newPet };
-	});
-
-	return result;
+		}
+		
+		throw error;
+	}
 };
 
 module.exports = {

@@ -1,5 +1,6 @@
 const { prisma } = require('../config/dbConfig');
 const storageRepository = require('./storageRepository');
+const bcrypt = require('bcrypt');
 
 // 미디어 배열의 만료된 SAS URL을 재생성하는 헬퍼 함수
 const refreshExpiredSasUrls = async (contentIds) => {

@@ -91,11 +91,11 @@ router.get('/:planId', async (req, res) => {
 		const { planId } = req.params;
 		const plan = await plansServices.findById(planId);
 		if (!plan) {
-			return res.status(404).json({ error: `planId ${planId} Plan not found` });
+			return res.status(404).json({ message: `planId ${planId} Plan not found` });
 		}
 		res.json(plan);
 	} catch (error) {
-		res.status(500).json({ error: 'Internal server error' });
+		res.status(500).json({ message: 'Internal server error' });
 	}
 });
 
@@ -107,11 +107,11 @@ router.patch('/:planId', async (req, res) => {
 		console.log(planData);
 		const plan = await plansServices.update(planId, planData);
 		if (!plan) {
-			return res.status(404).json({ error: `planId ${planId} Plan not found` });
+			return res.status(404).json({ message: `planId ${planId} Plan not found` });
 		}
 		res.json(plan);
 	} catch (error) {
-		res.status(500).json({ error: 'Internal server error' });
+		res.status(500).json({ message: 'Internal server error' });
 	}
 });
 

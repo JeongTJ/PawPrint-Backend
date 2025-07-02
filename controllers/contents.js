@@ -236,9 +236,7 @@ router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => 
 
 		// 기본 유효성 검사 (서비스에서도 하지만 컨트롤러에서 먼저 체크)
 		if (!contentType || !body) {
-			return res.status(400).json({
-				message: '필수 필드가 누락되었습니다. (contentType, body)'
-			});
+			return res.status(400).json({ message: '필수 필드가 누락되었습니다. (contentType, body)' });
 		}
 
 		const contentData = { contentType, body, userId };

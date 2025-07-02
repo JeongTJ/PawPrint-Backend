@@ -165,27 +165,16 @@ const upload = require('../middlewares/upload');
 router.post('/login', async (req, res) => {
 	try {
 		const { loginId, password } = req.body;
-
-		// 입력값 검증
-		if (!loginId || !password) {
-			return res.status(400).json({
-				success: false,
-				message: '아이디와 비밀번호를 입력해주세요',
-				data: null,
-				timestamp: new Date().toISOString()
-			});
-		}
-
 		// 사용자 인증
 		const user = await usersServices.authenticateUser(loginId, password);
-		
+
 		// 토큰 생성
 		const { refreshToken, accessToken } = await authServices.generateTokens(user.id);
 
 		// 성공 응답
 		res.json({
 				user: {
-					id: user.id.toString(),
+					id: user.id,
 					loginId: user.loginId,
 					nickname: user.nickname,
 					statusNote: user.statusNote,
@@ -198,24 +187,8 @@ router.post('/login', async (req, res) => {
 
 	} catch (error) {
 		console.error('로그인 오류:', error);
-		
-		// 인증 실패
-		if (error.message === 'INVALID_CREDENTIALS') {
-			return res.status(401).json({
-				success: false,
-				message: '아이디 또는 비밀번호가 올바르지 않습니다',
-				data: null,
-				timestamp: new Date().toISOString()
-			});
-		}
-
 		// 서버 오류
-		res.status(500).json({
-			success: false,
-			message: '로그인 중 오류가 발생했습니다',
-			data: null,
-			timestamp: new Date().toISOString()
-		});
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -224,44 +197,18 @@ router.post('/check-loginid', async (req, res) => {
 	try {
 		const { loginId } = req.body;
 
-		// 입력값 검증
-		if (!loginId) {
-			return res.status(400).json({
-				success: false,
-				message: '아이디를 입력해주세요',
-				data: null,
-				timestamp: new Date().toISOString()
-			});
-		}
-
-		// 아이디 길이 검증 (4-20자)
-		if (loginId.length < 4 || loginId.length > 20) {
-			return res.status(400).json({
-				success: false,
-				message: '아이디는 4~20자 사이로 입력해주세요',
-				data: null,
-				timestamp: new Date().toISOString()
-			});
-		}
-
 		// 중복 확인
 		const exists = await usersServices.checkLoginIdExists(loginId);
 		
 		if (exists) {
 			return res.status(409).json({ available: false });
 		}
-
 		// 사용 가능
 		res.json({ available: true });
 
 	} catch (error) {
 		console.error('아이디 중복 확인 오류:', error);
-		res.status(500).json({
-			success: false,
-			message: '아이디 확인 중 오류가 발생했습니다',
-			data: null,
-			timestamp: new Date().toISOString()
-		});
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -283,106 +230,64 @@ router.post('/register', upload.fields([
 
 		// 필수 입력값 검증
 		if (!loginId || !password || !nickname || !petName || !petGender) {
-			return res.status(400).json({
-				success: false,
-				message: '필수 정보를 모두 입력해주세요',
-				data: null,
-				timestamp: new Date().toISOString()
-			});
+			return res.status(400).json({ message: '필수 정보를 모두 입력해주세요' });
 		}
 
 		// 아이디 중복 확인
 		const exists = await usersServices.checkLoginIdExists(loginId);
 		if (exists) {
-			return res.status(409).json({
-				success: false,
-				message: '이미 사용 중인 아이디입니다',
-				data: null,
-				timestamp: new Date().toISOString()
-			});
+			return res.status(409).json({ message: '이미 사용 중인 아이디입니다' });
 		}
 
-		    // 프로필 이미지 업로드 처리 (Azure Storage)
-    let userProfileUrl = null;
-    let petProfileUrl = null;
+		// 파일 정리 (multipart에서 배열로 오므로 단일 파일로 변환)
+		const files = {
+			profileImage: req.files?.profileImage?.[0],
+			petProfileImage: req.files?.petProfileImage?.[0]
+		};
 
-    if (req.files?.profileImage?.[0]) {
-      const storageRepository = require('../repository/storageRepository');
-      const file = req.files.profileImage[0];
-      userProfileUrl = await storageRepository.uploadFile(
-        file.buffer, 
-        file.originalname, 
-        file.mimetype, 
-        'profiles'
-      );
-    }
-
-    if (req.files?.petProfileImage?.[0]) {
-      const storageRepository = require('../repository/storageRepository');
-      const file = req.files.petProfileImage[0];
-      petProfileUrl = await storageRepository.uploadFile(
-        file.buffer, 
-        file.originalname, 
-        file.mimetype, 
-        'pets'
-      );
-    }
-
-		// 회원가입 처리 (사용자 + 반려동물 정보)
+		// 회원가입 처리 (사용자 + 반려동물 정보 + 프로필 이미지 업로드)
 		const result = await usersServices.registerUserWithPet({
 			// 사용자 정보
 			loginId,
 			password,
 			nickname,
 			statusNote: statusNote || null,
-			profile: userProfileUrl,
 			// 반려동물 정보
 			pet: {
 				name: petName,
 				birthDate: petBirthDate ? new Date(petBirthDate) : null,
-				gender: petGender,
-				profile: petProfileUrl
+				gender: petGender
 			}
-		});
+		}, files);
 
 		// 토큰 생성
 		const { refreshToken, accessToken } = await authServices.generateTokens(result.user.id);
 
 		// 성공 응답
 		res.status(201).json({
-			success: true,
-			message: '회원가입이 완료되었습니다',
-			data: {
-				user: {
-					id: result.user.id.toString(),
-					loginId: result.user.loginId,
-					nickname: result.user.nickname,
-					statusNote: result.user.statusNote,
-					profile: result.user.profile
-				},
-				pet: {
-					id: result.pet.id.toString(),
-					name: result.pet.name,
-					birthDate: result.pet.birthDate,
-					gender: result.pet.gender,
-					profile: result.pet.profile
-				},
-				tokens: {
-					accessToken,
-					refreshToken
-				}
+			user: {
+				id: result.user.id,
+				loginId: result.user.loginId,
+				nickname: result.user.nickname,
+				statusNote: result.user.statusNote,
+				profile: result.user.profile
 			},
-			timestamp: new Date().toISOString()
+			pet: {
+				id: result.pet.id,
+				name: result.pet.name,
+				birthDate: result.pet.birthDate,
+				gender: result.pet.gender,
+				profile: result.pet.profile
+			},
+			tokens: {
+				accessToken,
+				refreshToken
+			}
 		});
 
 	} catch (error) {
 		console.error('회원가입 오류:', error);
-		res.status(500).json({
-			success: false,
-			message: '회원가입 중 오류가 발생했습니다',
-			data: null,
-			timestamp: new Date().toISOString()
-		});
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -395,7 +300,7 @@ router.get('/test-token', async (req, res) => {
 		res.json({ refreshToken, accessToken });
 	} catch (error) {
 		console.error('Error generating test token:', error);
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -407,7 +312,7 @@ router.post('/refresh-token', async (req, res) => {
 		res.json({ refreshToken: newRefreshToken, accessToken: newAccessToken });
 	} catch (error) {
 		console.error('Error refreshing token:', error);
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
