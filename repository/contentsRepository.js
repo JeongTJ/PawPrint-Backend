@@ -513,33 +513,65 @@ const regenerateSasUrlsForContent = async (contentId) => {
 
 // 좋아요 추가
 const addLike = async (userId, contentId) => {
-	return await prisma.contentLike.create({
-		data: {
-			userId: BigInt(userId),
-			contentId: BigInt(contentId)
-		},
-		include: {
-			user: {
-				select: {
-					id: true,
-					loginId: true,
-					nickname: true,
-					profile: true
+	return await prisma.$transaction(async (tx) => {
+		// 좋아요 추가
+		const like = await tx.contentLike.create({
+			data: {
+				userId: BigInt(userId),
+				contentId: BigInt(contentId)
+			},
+			include: {
+				user: {
+					select: {
+						id: true,
+						loginId: true,
+						nickname: true,
+						profile: true
+					}
 				}
 			}
-		}
+		});
+		
+		// 콘텐츠의 좋아요 수 증가
+		await tx.content.update({
+			where: { id: BigInt(contentId) },
+			data: {
+				likesCount: {
+					increment: 1
+				},
+				updatedAt: new Date()
+			}
+		});
+		
+		return like;
 	});
 };
 
 // 좋아요 제거
 const removeLike = async (userId, contentId) => {
-	return await prisma.contentLike.delete({
-		where: {
-			userId_contentId: {
-				userId: BigInt(userId),
-				contentId: BigInt(contentId)
+	return await prisma.$transaction(async (tx) => {
+		// 좋아요 제거
+		const like = await tx.contentLike.delete({
+			where: {
+				userId_contentId: {
+					userId: BigInt(userId),
+					contentId: BigInt(contentId)
+				}
 			}
-		}
+		});
+		
+		// 콘텐츠의 좋아요 수 감소
+		await tx.content.update({
+			where: { id: BigInt(contentId) },
+			data: {
+				likesCount: {
+					decrement: 1
+				},
+				updatedAt: new Date()
+			}
+		});
+		
+		return like;
 	});
 };
 
@@ -605,22 +637,38 @@ const getUserLikedContents = async (userId) => {
 
 // 댓글 추가
 const addComment = async (userId, contentId, body) => {
-	return await prisma.comment.create({
-		data: {
-			userId: BigInt(userId),
-			contentId: BigInt(contentId),
-			body
-		},
-		include: {
-			user: {
-				select: {
-					id: true,
-					loginId: true,
-					nickname: true,
-					profile: true
+	return await prisma.$transaction(async (tx) => {
+		// 댓글 생성
+		const comment = await tx.comment.create({
+			data: {
+				userId: BigInt(userId),
+				contentId: BigInt(contentId),
+				body
+			},
+			include: {
+				user: {
+					select: {
+						id: true,
+						loginId: true,
+						nickname: true,
+						profile: true
+					}
 				}
 			}
-		}
+		});
+		
+		// 콘텐츠의 댓글 수 증가
+		await tx.content.update({
+			where: { id: BigInt(contentId) },
+			data: {
+				commentsCount: {
+					increment: 1
+				},
+				updatedAt: new Date()
+			}
+		});
+		
+		return comment;
 	});
 };
 
@@ -694,11 +742,36 @@ const updateComment = async (commentId, userId, body) => {
 
 // 댓글 삭제
 const deleteComment = async (commentId, userId) => {
-	return await prisma.comment.delete({
-		where: { 
-			id: BigInt(commentId),
-			userId: BigInt(userId) // 작성자만 삭제 가능
+	return await prisma.$transaction(async (tx) => {
+		// 삭제할 댓글 조회
+		const commentToDelete = await tx.comment.findUnique({
+			where: {
+				id: BigInt(commentId),
+				userId: BigInt(userId) // 작성자만 삭제 가능
+			}
+		});
+		
+		if (!commentToDelete) {
+			throw new Error('댓글을 찾을 수 없거나 삭제 권한이 없습니다.');
 		}
+		
+		// 댓글 삭제
+		const deletedComment = await tx.comment.delete({
+			where: { id: BigInt(commentId) }
+		});
+		
+		// 콘텐츠의 댓글 수 감소
+		await tx.content.update({
+			where: { id: commentToDelete.contentId },
+			data: {
+				commentsCount: {
+					decrement: 1
+				},
+				updatedAt: new Date()
+			}
+		});
+		
+		return deletedComment;
 	});
 };
 
