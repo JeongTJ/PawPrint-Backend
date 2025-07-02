@@ -28,20 +28,20 @@ const findByContentType = async (content_type) => {
 	}
 };
 
-// 특정 회원의 게시물들을 미디어와 함께 찾기
-const findByMemberId = async (member_id) => {
+// 특정 사용자의 게시물들을 미디어와 함께 찾기
+const findByUserId = async (userId) => {
 	try {
-		if (!member_id || isNaN(member_id)) {
-			const error = new Error('유효하지 않은 회원 ID입니다.');
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
 			error.statusCode = 400;
 			throw error;
 		}
 		
-		return await contentsRepository.findByMemberId(member_id);
+		return await contentsRepository.findByUserId(userId);
 	} catch (error) {
 		if (error.statusCode) throw error;
-		console.error('회원별 게시물 조회 중 오류:', error);
-		throw new Error('회원의 게시물 조회에 실패했습니다.');
+		console.error('사용자별 게시물 조회 중 오류:', error);
+		throw new Error('사용자의 게시물 조회에 실패했습니다.');
 	}
 };
 
@@ -74,10 +74,10 @@ const findById = async (id) => {
 const create = async (contentData) => {
 	try {
 		// 입력 데이터 검증
-		const { member_id, content_type, body } = contentData;
+		const { userId, content_type, body } = contentData;
 		
-		if (!member_id || !content_type || !body) {
-			const error = new Error('필수 필드가 누락되었습니다. (member_id, content_type, body)');
+		if (!userId || !content_type || !body) {
+			const error = new Error('필수 필드가 누락되었습니다. (userId, content_type, body)');
 			error.statusCode = 400;
 			throw error;
 		}
@@ -100,10 +100,10 @@ const create = async (contentData) => {
 const createWithMedia = async (contentData, mediaFiles = []) => {
 	try {
 		// 입력 데이터 검증
-		const { member_id, content_type, body } = contentData;
+		const { user_id, content_type, body } = contentData;
 		
-		if (!member_id || !content_type || !body) {
-			const error = new Error('필수 필드가 누락되었습니다. (member_id, content_type, body)');
+		if (!user_id || !content_type || !body) {
+			const error = new Error('필수 필드가 누락되었습니다. (user_id, content_type, body)');
 			error.statusCode = 400;
 			throw error;
 		}
@@ -209,7 +209,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 };
 
 // 게시물과 관련 미디어 모두 삭제
-const deleteById = async (id, member_id) => {
+const deleteById = async (id, userId) => {
 	try {
 		if (!id || isNaN(id)) {
 			const error = new Error('유효하지 않은 게시물 ID입니다.');
@@ -217,8 +217,8 @@ const deleteById = async (id, member_id) => {
 			throw error;
 		}
 		
-		if (!member_id || isNaN(member_id)) {
-			const error = new Error('유효하지 않은 회원 ID입니다.');
+		if (!userId || isNaN(userId)) {
+			const error = new Error('유효하지 않은 사용자 ID입니다.');
 			error.statusCode = 400;
 			throw error;
 		}
@@ -232,13 +232,13 @@ const deleteById = async (id, member_id) => {
 		}
 
 		// 작성자 확인
-		if (parseInt(content.member_id) !== parseInt(member_id)) {	
+		if (parseInt(content.userId) !== parseInt(userId)) {	
 			const error = new Error('본인이 작성한 게시물만 삭제할 수 있습니다.');
 			error.statusCode = 403;
 			throw error;
 		}
 
-		const deletedContent = await contentsRepository.deleteById(id, member_id);
+		const deletedContent = await contentsRepository.deleteById(id, userId);
 		
 		if (!deletedContent) {
 			const error = new Error('게시물 삭제에 실패했습니다.');
@@ -280,7 +280,7 @@ const findMediaByContentId = async (content_id) => {
 };
 
 // 특정 미디어 파일만 삭제
-const deleteMediaById = async (media_id, content_id, member_id) => {
+const deleteMediaById = async (media_id, content_id, userId) => {
 	try {
 		if (!media_id || isNaN(media_id)) {
 			const error = new Error('유효하지 않은 미디어 ID입니다.');
@@ -302,7 +302,7 @@ const deleteMediaById = async (media_id, content_id, member_id) => {
 			throw error;
 		}
 		
-		if (parseInt(content.member_id) !== parseInt(member_id)) {
+		if (parseInt(content.userId) !== parseInt(userId)) {
 			const error = new Error('본인이 작성한 게시물의 미디어만 삭제할 수 있습니다.');
 			error.statusCode = 403;
 			throw error;
@@ -334,7 +334,7 @@ module.exports = {
 	findAll, 
 	findById,
 	findByContentType,
-	findByMemberId,
+	findByUserId,
 	create, 
 	update, 
 	deleteById,

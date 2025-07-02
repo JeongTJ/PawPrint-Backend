@@ -3,9 +3,9 @@ const MediaResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
-		file_url: { type: 'string', example: 'https://storage.azure.com/images/dog.jpg?sasToken=...' },
-		created_at: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
-		updated_at: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+		fileUrl: { type: 'string', example: 'https://storage.azure.com/images/dog.jpg?sasToken=...' },
+		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
+		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 	},
 };
 
@@ -14,7 +14,7 @@ const ContentWithMediaResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
-		member_id: { type: 'integer', example: 5 },
+		user_id: { type: 'integer', example: 5 },
 		content_type: { type: 'string', enum: ['qna', 'community'], example: 'community' },
 		body: { type: 'string', example: '우리 강아지가 오늘 처음으로 바다를 봤어요! 🐕🌊' },
 		likes_count: { type: 'integer', example: 12 },
@@ -47,7 +47,7 @@ const QnaContentResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 2 },
-		member_id: { type: 'integer', example: 3 },
+		user_id: { type: 'integer', example: 3 },
 		content_type: { type: 'string', example: 'qna' },
 		body: { type: 'string', example: '강아지가 밥을 안 먹어요. 어떻게 해야 할까요?' },
 		likes_count: { type: 'integer', example: 5 },
@@ -67,7 +67,7 @@ const CommunityContentResponse = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
-		member_id: { type: 'integer', example: 5 },
+		user_id: { type: 'integer', example: 5 },
 		content_type: { type: 'string', example: 'community' },
 		body: { type: 'string', example: '우리 강아지 산책 사진들! 🐕' },
 		likes_count: { type: 'integer', example: 12 },

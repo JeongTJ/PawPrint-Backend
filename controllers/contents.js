@@ -227,7 +227,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => {
 	try {
-		const member_id = req.user.id;
+		const user_id = req.user.id;
 		const { content_type, body } = req.body;
 		const imageFiles = req.files;
 
@@ -238,7 +238,7 @@ router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => 
 			});
 		}
 
-		const contentData = { content_type, body, member_id };
+		const contentData = { content_type, body, user_id };
 
 		// 미디어 파일이 있으면 createWithMedia, 없으면 create 사용
 		let content;
@@ -271,9 +271,9 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
-		const member_id = req.user.id;
+		const user_id = req.user.id;
 		
-		const deletedContent = await contentsServices.deleteById(id, member_id);
+		const deletedContent = await contentsServices.deleteById(id, user_id);
 		res.json(deletedContent);
 	} catch (error) {
 		console.error('게시물 삭제 오류:', error);
@@ -285,11 +285,11 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
-		const member_id = req.user.id;
+		const user_id = req.user.id;
 		
 		// 권한 확인: 게시물 작성자만 갱신 가능
 		const content = await contentsServices.findById(id);
-		if (content.member_id !== member_id) {
+		if (content.user_id !== user_id) {
 			return res.status(403).json({ message: '갱신 권한이 없습니다.' });
 		}
 		

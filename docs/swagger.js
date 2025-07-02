@@ -1,5 +1,9 @@
 const swaggerJsdoc = require('swagger-jsdoc');
-const { Member, MemberView } = require('./memberSchemas');
+const { 
+	UserResponse, 
+	UserCreateRequest, 
+	UserUpdateRequest 
+} = require('./userSchemas');
 const { 
 	MediaResponse,
 	ContentWithMediaResponse,
@@ -60,8 +64,9 @@ const options = {
 				ContentUpdateWithMediaRequest: ContentUpdateWithMediaRequest,
 				ErrorResponse: ErrorResponse,
 
-				Member: Member,
-				MemberView: MemberView,
+				UserResponse: UserResponse,
+				UserCreateRequest: UserCreateRequest,
+				UserUpdateRequest: UserUpdateRequest,
 				Auth: {
 					type: 'object',
 					properties: {

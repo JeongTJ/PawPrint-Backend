@@ -1,20 +1,27 @@
-const { pool } = require('../config/dbConfig');
+const { prisma } = require('../config/dbConfig');
 const storageRepository = require('./storageRepository');
 
-// 미디어 배열의 만료된 SAS URL을 재생성하는 헬퍼 함수 (DB 업데이트 후 재조회)
+// 미디어 배열의 만료된 SAS URL을 재생성하는 헬퍼 함수
 const refreshExpiredSasUrls = async (contentIds) => {
 	if (!Array.isArray(contentIds) || contentIds.length === 0) {
 		return [];
 	}
 	
 	// 현재 미디어 정보 조회
-	const { rows: currentMedia } = await pool.query(
-		'SELECT * FROM media WHERE content_id = ANY($1) ORDER BY content_id, id ASC',
-		[contentIds]
-	);
+	const currentMedia = await prisma.media.findMany({
+		where: {
+			contentId: {
+				in: contentIds
+			}
+		},
+		orderBy: [
+			{ contentId: 'asc' },
+			{ id: 'asc' }
+		]
+	});
 	
 	const expiredMedia = currentMedia.filter(media => 
-		storageRepository.isSasUrlExpired(media.file_url)
+		storageRepository.isSasUrlExpired(media.fileUrl)
 	);
 	
 	if (expiredMedia.length === 0) {
@@ -25,22 +32,23 @@ const refreshExpiredSasUrls = async (contentIds) => {
 	
 	// 만료된 URL들을 재생성
 	const regenerateResult = await storageRepository.regenerateMultipleSasUrls(
-		expiredMedia.map(media => media.file_url)
+		expiredMedia.map(media => media.fileUrl)
 	);
 	
 	// 성공적으로 재생성된 URL들을 DB에 업데이트
-	const client = await pool.connect();
 	try {
-		await client.query('BEGIN');
+		await prisma.$transaction(async (tx) => {
+			for (const {old: oldUrl, new: newUrl} of regenerateResult.success) {
+				await tx.media.updateMany({
+					where: { fileUrl: oldUrl },
+					data: { 
+						fileUrl: newUrl,
+						updatedAt: new Date()
+					}
+				});
+			}
+		});
 		
-		for (const {old: oldUrl, new: newUrl} of regenerateResult.success) {
-			await client.query(
-				'UPDATE media SET file_url = $1, updated_at = now() WHERE file_url = $2',
-				[newUrl, oldUrl]
-			);
-		}
-		
-		await client.query('COMMIT');
 		console.log(`${regenerateResult.success.length}개의 SAS URL 재생성 및 DB 업데이트 완료`);
 		
 		if (regenerateResult.failed.length > 0) {
@@ -48,132 +56,122 @@ const refreshExpiredSasUrls = async (contentIds) => {
 		}
 		
 		// DB 업데이트 후 최신 데이터 재조회
-		const { rows: updatedMedia } = await pool.query(
-			'SELECT * FROM media WHERE content_id = ANY($1) ORDER BY content_id, id ASC',
-			[contentIds]
-		);
+		const updatedMedia = await prisma.media.findMany({
+			where: {
+				contentId: {
+					in: contentIds
+				}
+			},
+			orderBy: [
+				{ contentId: 'asc' },
+				{ id: 'asc' }
+			]
+		});
 		
 		return updatedMedia;
 		
 	} catch (error) {
-		await client.query('ROLLBACK');
 		console.error('SAS URL DB 업데이트 실패:', error);
 		return currentMedia; // 실패 시 원본 데이터 반환
-	} finally {
-		client.release();
 	}
 };
 
 // 모든 게시물을 미디어와 함께 찾기
 const findAll = async () => {
-	const { rows } = await pool.query(`
-		SELECT 
-			c.*
-		FROM contents c
-		ORDER BY c.id ASC
-	`);
-	
-	if (rows.length === 0) {
-		return rows;
-	}
-	
-	// 모든 콘텐츠 ID 추출
-	const contentIds = rows.map(row => row.id);
-	
-	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
-	const updatedMedia = await refreshExpiredSasUrls(contentIds);
-	
-	// 콘텐츠별로 미디어 그룹화
-	const mediaByContentId = {};
-	updatedMedia.forEach(media => {
-		if (!mediaByContentId[media.content_id]) {
-			mediaByContentId[media.content_id] = [];
-		}
-		mediaByContentId[media.content_id].push(media);
+	const contents = await prisma.content.findMany({
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		},
+		orderBy: { id: 'asc' }
 	});
 	
-	// 각 콘텐츠에 미디어 정보 추가
-	return rows.map(row => ({
-		...row,
-		media: mediaByContentId[row.id] || []
-	}));
+	if (contents.length === 0) {
+		return contents;
+	}
+	
+	// 만료된 SAS URL 갱신 후 최신 데이터 재조회
+	const contentIds = contents.map(content => content.id);
+	await refreshExpiredSasUrls(contentIds);
+	
+	// 최신 데이터 재조회
+	return await prisma.content.findMany({
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		},
+		orderBy: { id: 'asc' }
+	});
 };
 
 // 특정 게시물 타입으로 미디어와 함께 찾기 (qna, community)
-const findByContentType = async (content_type) => {
-	const { rows } = await pool.query(`
-		SELECT 
-			c.*
-		FROM contents c
-		WHERE c.content_type = $1
-		ORDER BY c.id ASC
-	`, [content_type]);
-	
-	if (rows.length === 0) {
-		return rows;
-	}
-	
-	// 모든 콘텐츠 ID 추출
-	const contentIds = rows.map(row => row.id);
-	
-	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
-	const updatedMedia = await refreshExpiredSasUrls(contentIds);
-	
-	// 콘텐츠별로 미디어 그룹화
-	const mediaByContentId = {};
-	updatedMedia.forEach(media => {
-		if (!mediaByContentId[media.content_id]) {
-			mediaByContentId[media.content_id] = [];
-		}
-		mediaByContentId[media.content_id].push(media);
+const findByContentType = async (contentType) => {
+	const contents = await prisma.content.findMany({
+		where: { contentType },
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		},
+		orderBy: { id: 'asc' }
 	});
 	
-	// 각 콘텐츠에 미디어 정보 추가
-	return rows.map(row => ({
-		...row,
-		media: mediaByContentId[row.id] || []
-	}));
+	if (contents.length === 0) {
+		return contents;
+	}
+	
+	// 만료된 SAS URL 갱신 후 최신 데이터 재조회
+	const contentIds = contents.map(content => content.id);
+	await refreshExpiredSasUrls(contentIds);
+	
+	// 최신 데이터 재조회
+	return await prisma.content.findMany({
+		where: { contentType },
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		},
+		orderBy: { id: 'asc' }
+	});
 };
 
-// 특정 회원의 게시물을 미디어와 함께 찾기
-const findByMemberId = async (member_id) => {
-	const { rows } = await pool.query(`
-		SELECT 
-			c.*
-		FROM contents c
-		WHERE c.member_id = $1
-		ORDER BY c.id ASC
-	`, [member_id]);
-	
-	if (rows.length === 0) {
-		return rows;
-	}
-	
-	// 모든 콘텐츠 ID 추출
-	const contentIds = rows.map(row => row.id);
-	
-	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
-	const updatedMedia = await refreshExpiredSasUrls(contentIds);
-	
-	// 콘텐츠별로 미디어 그룹화
-	const mediaByContentId = {};
-	updatedMedia.forEach(media => {
-		if (!mediaByContentId[media.content_id]) {
-			mediaByContentId[media.content_id] = [];
-		}
-		mediaByContentId[media.content_id].push(media);
+// 특정 사용자의 게시물을 미디어와 함께 찾기
+const findByUserId = async (userId) => {
+	const contents = await prisma.content.findMany({
+		where: { userId: BigInt(userId) },
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		},
+		orderBy: { id: 'asc' }
 	});
 	
-	// 각 콘텐츠에 미디어 정보 추가
-	return rows.map(row => ({
-		...row,
-		media: mediaByContentId[row.id] || []
-	}));
+	if (contents.length === 0) {
+		return contents;
+	}
+	
+	// 만료된 SAS URL 갱신 후 최신 데이터 재조회
+	const contentIds = contents.map(content => content.id);
+	await refreshExpiredSasUrls(contentIds);
+	
+	// 최신 데이터 재조회
+	return await prisma.content.findMany({
+		where: { userId: BigInt(userId) },
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		},
+		orderBy: { id: 'asc' }
+	});
 };
 
 // 특정 게시물을 미디어와 함께 생성 (트랜잭션 사용)
 const createWithMedia = async (contentData, mediaFiles = []) => {
-	const client = await pool.connect();
 	let uploadedFileUrls = [];
 	
 	try {
@@ -182,323 +180,346 @@ const createWithMedia = async (contentData, mediaFiles = []) => {
 			uploadedFileUrls = await storageRepository.uploadMultipleFiles(mediaFiles);
 		}
 		
-		// 2. DB 트랜잭션 시작
-		await client.query('BEGIN');
+		// 2. DB 트랜잭션으로 콘텐츠와 미디어 생성
+		const result = await prisma.$transaction(async (tx) => {
+			const { userId, contentType, body } = contentData;
+			
+			// 콘텐츠 생성
+			const content = await tx.content.create({
+				data: {
+					userId: BigInt(userId),
+					contentType,
+					body
+				}
+			});
+			
+			// 미디어 파일들 DB에 저장
+			const mediaRecords = [];
+			if (uploadedFileUrls.length > 0) {
+				for (const fileUrl of uploadedFileUrls) {
+					const media = await tx.media.create({
+						data: {
+							contentId: content.id,
+							fileUrl
+						}
+					});
+					mediaRecords.push(media);
+				}
+			}
+			
+			return {
+				...content,
+				media: mediaRecords
+			};
+		});
 		
-		const { member_id, content_type, body } = contentData;
+		console.log(`✅ 콘텐츠 생성 완료 (ID: ${result.id})`);
+		return result;
 		
-		// 콘텐츠 생성
-		const contentResult = await client.query(
-			'INSERT INTO contents (member_id, content_type, body) VALUES ($1, $2, $3) RETURNING *',
-			[member_id, content_type, body]
-		);
+	} catch (error) {
+		console.error('❌ 콘텐츠 생성 실패:', error);
 		
-		const content = contentResult.rows[0];
-		
-		// 미디어 파일들 DB에 저장
-		const mediaRecords = [];
+		// 롤백: 업로드된 파일들 삭제
 		if (uploadedFileUrls.length > 0) {
-			for (const url of uploadedFileUrls) {
-				const mediaResult = await client.query(
-					'INSERT INTO media (content_id, file_url) VALUES ($1, $2) RETURNING *',
-					[content.id, url]
-				);
-				mediaRecords.push(mediaResult.rows[0]);
+			try {
+				await storageRepository.deleteMultipleFiles(uploadedFileUrls);
+				console.log('🧹 업로드된 파일 정리 완료');
+			} catch (cleanupError) {
+				console.error('파일 정리 실패:', cleanupError);
 			}
 		}
 		
-		await client.query('COMMIT');
-		
-		// 생성된 콘텐츠에 미디어 정보 포함하여 반환
-		return {
-			...content,
-			media: mediaRecords
-		};
-		
-	} catch (error) {
-		await client.query('ROLLBACK');
-		
-		// 실패 시 업로드된 파일들을 Storage에서 삭제 (보상 트랜잭션)
-		if (uploadedFileUrls.length > 0) {
-			console.log('DB 트랜잭션 실패로 인한 파일 정리 시작...');
-			const deleteResult = await storageRepository.deleteMultipleFiles(uploadedFileUrls);
-			console.log('파일 정리 완료:', deleteResult);
-		}
-		
 		throw error;
-	} finally {
-		client.release();
 	}
 };
 
-// 기존 단순 게시물 생성 (하위 호환성을 위해 유지)
+// 미디어 없이 콘텐츠만 생성
 const create = async (contentData) => {
-	return await createWithMedia(contentData, []);
+	const { userId, contentType, body } = contentData;
+	
+	return await prisma.content.create({
+		data: {
+			userId: BigInt(userId),
+			contentType,
+			body
+		},
+		include: {
+			media: true
+		}
+	});
 };
 
-// 특정 게시물을 미디어와 함께 ID로 찾기
+// ID로 특정 게시물을 미디어와 함께 찾기
 const findById = async (id) => {
-	const { rows } = await pool.query(`
-		SELECT c.*
-		FROM contents c
-		WHERE c.id = $1
-	`, [id]);
+	const content = await prisma.content.findUnique({
+		where: { id: BigInt(id) },
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		}
+	});
 	
-	if (rows.length === 0) {
-		return undefined;
+	if (!content) {
+		return null;
 	}
 	
-	const content = rows[0];
+	// 만료된 SAS URL 갱신
+	await refreshExpiredSasUrls([content.id]);
 	
-	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
-	const updatedMedia = await refreshExpiredSasUrls([content.id]);
-	
-	// 콘텐츠에 미디어 정보 추가
-	return {
-		...content,
-		media: updatedMedia
-	};
+	// 최신 데이터 재조회
+	return await prisma.content.findUnique({
+		where: { id: BigInt(id) },
+		include: {
+			media: {
+				orderBy: { id: 'asc' }
+			}
+		}
+	});
 };
 
-// 특정 게시물 정보를 미디어와 함께 업데이트 (Storage + DB 분산 트랜잭션)
+// 게시물과 미디어를 함께 업데이트 (트랜잭션 사용)
 const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
-	const client = await pool.connect();
 	let uploadedFileUrls = [];
 	let oldMediaUrls = [];
 	
 	try {
-		// 1. 기존 미디어 정보 백업 (롤백용)
-		const existingMediaResult = await client.query(
-			'SELECT file_url FROM media WHERE content_id = $1',
-			[id]
-		);
-		oldMediaUrls = existingMediaResult.rows.map(row => row.file_url);
-		
-		// 2. 새 파일들을 먼저 Storage에 업로드 (미디어 변경이 있는 경우)
-		if (newMediaFiles !== null && newMediaFiles.length > 0) {
-			uploadedFileUrls = await storageRepository.uploadMultipleFiles(newMediaFiles);
-		}
-		
-		// 3. DB 트랜잭션 시작
-		await client.query('BEGIN');
-		
-		const { body } = contentData;
-		
-		// 콘텐츠 업데이트
-		const contentResult = await client.query(
-			`UPDATE contents 
-			SET 
-			body = COALESCE($1, body), 
-			updated_at = now() 
-			WHERE id = $2 
-			RETURNING *`,
-			[body, id]
-		);
-		
-		const content = contentResult.rows[0];
-		
-		// 미디어 업데이트 처리
-		let mediaFiles = [];
-		if (newMediaFiles !== null) {
-			// 기존 미디어 DB에서 삭제
-			await client.query('DELETE FROM media WHERE content_id = $1', [id]);
+		const result = await prisma.$transaction(async (tx) => {
+			// 현재 콘텐츠와 미디어 정보 조회
+			const currentContent = await tx.content.findUnique({
+				where: { id: BigInt(id) },
+				include: { media: true }
+			});
 			
-			// 새로운 미디어 DB에 추가
-			if (uploadedFileUrls.length > 0) {
-				for (const url of uploadedFileUrls) {
-					const mediaResult = await client.query(
-						'INSERT INTO media (content_id, file_url) VALUES ($1, $2) RETURNING *',
-						[id, url]
-					);
-					mediaFiles.push(mediaResult.rows[0]);
+			if (!currentContent) {
+				throw new Error('게시물을 찾을 수 없습니다');
+			}
+			
+			// 새 파일들이 있으면 업로드
+			if (newMediaFiles && newMediaFiles.length > 0) {
+				uploadedFileUrls = await storageRepository.uploadMultipleFiles(newMediaFiles);
+			}
+			
+			// 기존 미디어 URL들 백업 (롤백용)
+			oldMediaUrls = currentContent.media.map(media => media.fileUrl);
+			
+			// 콘텐츠 업데이트
+			const updatedContent = await tx.content.update({
+				where: { id: BigInt(id) },
+				data: {
+					body: contentData.body,
+					updatedAt: new Date()
 				}
-			}
-		} else {
-			// 미디어 변경이 없는 경우 기존 미디어 조회
-			const mediaResult = await client.query(
-				'SELECT * FROM media WHERE content_id = $1 ORDER BY id ASC',
-				[id]
-			);
-			mediaFiles = mediaResult.rows;
-		}
-		
-		// 4. DB 커밋
-		await client.query('COMMIT');
-		
-		// 5. DB 성공 후 기존 파일들을 Storage에서 삭제
-		if (newMediaFiles !== null && oldMediaUrls.length > 0) {
-			console.log('기존 파일 삭제 시작...', oldMediaUrls);
-			const deleteResult = await storageRepository.deleteMultipleFiles(oldMediaUrls);
-			console.log('기존 파일 삭제 완료:', deleteResult);
+			});
 			
-			if (deleteResult.failed.length > 0) {
-				console.warn('일부 파일 삭제 실패:', deleteResult.failed);
+			// 새 미디어가 있으면 교체
+			if (uploadedFileUrls.length > 0) {
+				// 기존 미디어 삭제
+				await tx.media.deleteMany({
+					where: { contentId: BigInt(id) }
+				});
+				
+				// 새 미디어 추가
+				const newMediaRecords = [];
+				for (const fileUrl of uploadedFileUrls) {
+					const media = await tx.media.create({
+						data: {
+							contentId: BigInt(id),
+							fileUrl
+						}
+					});
+					newMediaRecords.push(media);
+				}
+				
+				return {
+					...updatedContent,
+					media: newMediaRecords
+				};
+			}
+			
+			// 새 미디어가 없으면 기존 미디어 유지
+			return {
+				...updatedContent,
+				media: currentContent.media
+			};
+		});
+		
+		// 트랜잭션 성공 후 기존 파일들 삭제
+		if (uploadedFileUrls.length > 0 && oldMediaUrls.length > 0) {
+			try {
+				await storageRepository.deleteMultipleFiles(oldMediaUrls);
+				console.log(`🧹 기존 미디어 파일 ${oldMediaUrls.length}개 삭제 완료`);
+			} catch (deleteError) {
+				console.warn('기존 파일 삭제 실패:', deleteError);
 			}
 		}
 		
-		return {
-			...content,
-			media: mediaFiles
-		};
+		console.log(`✅ 콘텐츠 업데이트 완료 (ID: ${id})`);
+		return result;
 		
 	} catch (error) {
-		await client.query('ROLLBACK');
+		console.error('❌ 콘텐츠 업데이트 실패:', error);
 		
-		// DB 실패 시 새로 업로드한 파일들을 Storage에서 삭제 (보상 트랜잭션)
+		// 롤백: 새로 업로드된 파일들 삭제
 		if (uploadedFileUrls.length > 0) {
-			console.log('DB 트랜잭션 실패로 인한 신규 파일 정리 시작...', uploadedFileUrls);
-			const deleteResult = await storageRepository.deleteMultipleFiles(uploadedFileUrls);
-			console.log('신규 파일 정리 완료:', deleteResult);
+			try {
+				await storageRepository.deleteMultipleFiles(uploadedFileUrls);
+				console.log('🧹 롤백: 새로 업로드된 파일 정리 완료');
+			} catch (cleanupError) {
+				console.error('롤백 파일 정리 실패:', cleanupError);
+			}
 		}
 		
 		throw error;
-	} finally {
-		client.release();
 	}
 };
 
-// 기존 단순 게시물 업데이트 (하위 호환성을 위해 유지)
+// 미디어 없이 콘텐츠만 업데이트
 const update = async (id, contentData) => {
-	return await updateWithMedia(id, contentData, null);
+	return await prisma.content.update({
+		where: { id: BigInt(id) },
+		data: {
+			body: contentData.body,
+			updatedAt: new Date()
+		},
+		include: {
+			media: true
+		}
+	});
 };
 
-// 특정 게시물과 관련 미디어를 모두 삭제 (Storage + DB)
-const deleteById = async (id, member_id) => {
-	const client = await pool.connect();
-	let deletedData = null;
-	let mediaUrls = [];
-	
+// 게시물과 모든 관련 데이터 삭제 (트랜잭션 사용)
+const deleteById = async (id, userId) => {
 	try {
-		await client.query('BEGIN');
-		
-		// 삭제하기 전에 데이터 조회 (반환용 + Storage 파일 삭제용)
-		const contentResult = await client.query(`
-			SELECT 
-				c.*,
-				COALESCE(
-					JSON_AGG(
-						JSON_BUILD_OBJECT(
-							'id', m.id,
-							'file_url', m.file_url,
-							'created_at', m.created_at,
-							'updated_at', m.updated_at
-						)
-					) FILTER (WHERE m.id IS NOT NULL), 
-					'[]'::json
-				) as media
-			FROM contents c
-			LEFT JOIN media m ON c.id = m.content_id
-			WHERE c.id = $1 AND c.member_id = $2
-			GROUP BY c.id
-		`, [id, member_id]);
-		
-		if (contentResult.rows.length === 0) {
-			await client.query('ROLLBACK');
-			return null;
-		}
-		
-		deletedData = contentResult.rows[0];
-		
-		// Storage에서 삭제할 파일 URL들 추출
-		if (deletedData.media && Array.isArray(deletedData.media)) {
-			mediaUrls = deletedData.media.map(media => media.file_url);
-		}
-		
-		// DB에서 미디어 및 콘텐츠 삭제 (외래키 제약조건으로 자동 삭제되지만 명시적으로 처리)
-		await client.query('DELETE FROM media WHERE content_id = $1', [id]);
-		await client.query('DELETE FROM contents WHERE id = $1 AND member_id = $2', [id, member_id]);
-		
-		await client.query('COMMIT');
-		
-		// DB 삭제 성공 후 Storage에서 파일들 삭제
-		if (mediaUrls.length > 0) {
-			console.log('관련 파일 삭제 시작...', mediaUrls);
-			const deleteResult = await storageRepository.deleteMultipleFiles(mediaUrls);
-			console.log('관련 파일 삭제 완료:', deleteResult);
+		const result = await prisma.$transaction(async (tx) => {
+			// 삭제할 콘텐츠와 미디어 조회
+			const contentToDelete = await tx.content.findUnique({
+				where: { 
+					id: BigInt(id),
+					userId: BigInt(userId) 
+				},
+				include: { media: true }
+			});
 			
-			if (deleteResult.failed.length > 0) {
-				console.warn('일부 파일 삭제 실패:', deleteResult.failed);
+			if (!contentToDelete) {
+				throw new Error('게시물을 찾을 수 없거나 삭제 권한이 없습니다');
+			}
+			
+			const mediaUrls = contentToDelete.media.map(media => media.fileUrl);
+			
+			// DB에서 삭제 (CASCADE로 관련 데이터 자동 삭제)
+			await tx.content.delete({
+				where: { id: BigInt(id) }
+			});
+			
+			return { deletedContent: contentToDelete, mediaUrls };
+		});
+		
+		// 트랜잭션 성공 후 Storage에서 파일 삭제
+		if (result.mediaUrls.length > 0) {
+			try {
+				await storageRepository.deleteMultipleFiles(result.mediaUrls);
+				console.log(`🧹 미디어 파일 ${result.mediaUrls.length}개 삭제 완료`);
+			} catch (deleteError) {
+				console.warn('미디어 파일 삭제 실패:', deleteError);
 			}
 		}
 		
-		return deletedData;
+		console.log(`✅ 콘텐츠 삭제 완료 (ID: ${id})`);
+		return { success: true, message: '게시물이 삭제되었습니다' };
 		
 	} catch (error) {
-		await client.query('ROLLBACK');
+		console.error('❌ 콘텐츠 삭제 실패:', error);
 		throw error;
-	} finally {
-		client.release();
 	}
 };
 
 // 특정 콘텐츠의 미디어만 조회
-const findMediaByContentId = async (content_id) => {
-	// 만료된 SAS URL 갱신 후 최신 미디어 데이터 조회
-	const updatedMedia = await refreshExpiredSasUrls([content_id]);
+const findMediaByContentId = async (contentId) => {
+	const media = await prisma.media.findMany({
+		where: { contentId: BigInt(contentId) },
+		orderBy: { id: 'asc' }
+	});
 	
-	// 해당 콘텐츠의 미디어만 필터링해서 반환
-	return updatedMedia.filter(media => media.content_id === parseInt(content_id));
+	// 만료된 SAS URL 갱신
+	await refreshExpiredSasUrls([BigInt(contentId)]);
+	
+	// 최신 데이터 재조회
+	return await prisma.media.findMany({
+		where: { contentId: BigInt(contentId) },
+		orderBy: { id: 'asc' }
+	});
 };
 
-// 특정 미디어 삭제 (Storage + DB)
-const deleteMediaById = async (media_id, content_id) => {
-	const client = await pool.connect();
-	
+// 특정 미디어 삭제
+const deleteMediaById = async (mediaId, contentId) => {
 	try {
-		await client.query('BEGIN');
-		
-		// 삭제하기 전에 파일 URL 조회
-		const mediaResult = await client.query(
-			'SELECT file_url FROM media WHERE id = $1 AND content_id = $2',
-			[media_id, content_id]
-		);
-		
-		if (mediaResult.rows.length === 0) {
-			await client.query('ROLLBACK');
-			return null;
-		}
-		
-		const fileUrl = mediaResult.rows[0].file_url;
-		
-		// DB에서 미디어 삭제
-		const deleteResult = await client.query(
-			'DELETE FROM media WHERE id = $1 AND content_id = $2 RETURNING *',
-			[media_id, content_id]
-		);
-		
-		await client.query('COMMIT');
-		
-		// DB 삭제 성공 후 Storage에서 파일 삭제
-		if (fileUrl) {
-			console.log('미디어 파일 삭제 시작...', fileUrl);
-			const storageDeleteSuccess = await storageRepository.deleteFile(fileUrl);
-			if (!storageDeleteSuccess) {
-				console.warn('Storage에서 파일 삭제 실패:', fileUrl);
-			} else {
-				console.log('미디어 파일 삭제 완료:', fileUrl);
+		const result = await prisma.$transaction(async (tx) => {
+			// 삭제할 미디어 조회
+			const mediaToDelete = await tx.media.findUnique({
+				where: { 
+					id: BigInt(mediaId),
+					contentId: BigInt(contentId)
+				}
+			});
+			
+			if (!mediaToDelete) {
+				throw new Error('미디어를 찾을 수 없습니다');
 			}
+			
+			// DB에서 삭제
+			await tx.media.delete({
+				where: { id: BigInt(mediaId) }
+			});
+			
+			return mediaToDelete;
+		});
+		
+		// Storage에서 파일 삭제
+		try {
+			await storageRepository.deleteFile(result.fileUrl);
+			console.log(`🧹 미디어 파일 삭제 완료: ${result.fileUrl}`);
+		} catch (deleteError) {
+			console.warn('미디어 파일 삭제 실패:', deleteError);
 		}
 		
-		return deleteResult.rows[0];
+		return { success: true, message: '미디어가 삭제되었습니다' };
 		
 	} catch (error) {
-		await client.query('ROLLBACK');
+		console.error('❌ 미디어 삭제 실패:', error);
 		throw error;
-	} finally {
-		client.release();
 	}
+};
+
+// SAS URL 수동 재생성
+const regenerateSasUrlsForContent = async (contentId) => {
+	const media = await prisma.media.findMany({
+		where: { contentId: BigInt(contentId) }
+	});
+	
+	if (media.length === 0) {
+		return { message: '미디어가 없습니다' };
+	}
+	
+	await refreshExpiredSasUrls([BigInt(contentId)]);
+	
+	return { 
+		success: true, 
+		message: `${media.length}개의 SAS URL이 갱신되었습니다` 
+	};
 };
 
 module.exports = {
 	findAll,
 	findByContentType,
-	findByMemberId,
-	create,
+	findByUserId,
 	createWithMedia,
+	create,
 	findById,
-	update,
 	updateWithMedia,
+	update,
 	deleteById,
 	findMediaByContentId,
 	deleteMediaById,
+	regenerateSasUrlsForContent
 };
