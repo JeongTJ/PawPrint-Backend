@@ -94,7 +94,7 @@ const requestLogger = winston.createLogger({
 				winston.format.colorize(),
 				winston.format.printf(({ timestamp, level, message, ...meta }) => {
 					const { method, url, statusCode, responseTime, user } = meta;
-					const userInfo = user ? `[${user.loginId}]` : '[Guest]';
+					const userInfo = user ? `[${user.nickname || user.loginId || user.id || 'User'}]` : '[Guest]';
 					return `${timestamp} ${userInfo} ${method} ${url} ${statusCode} ${responseTime}`;
 				})
 			)
