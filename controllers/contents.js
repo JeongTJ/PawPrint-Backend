@@ -322,7 +322,7 @@ router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 		);
 		
 		// DB 업데이트
-		const { pool } = require('../config/psqlConfig');
+		const { pool } = require('../config/dbConfig');
 		const client = await pool.connect();
 		
 		try {

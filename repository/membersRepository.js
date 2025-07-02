@@ -1,4 +1,4 @@
-const { pool } = require('../config/psqlConfig');
+const { pool } = require('../config/dbConfig');
 
 // 모든 회원 찾기
 const findAll = async () => {
@@ -29,6 +29,8 @@ const findById = async (id) => {
 // 특정 회원 생성
 const create = async (memberData) => {
 	const { user_id, name, email, password } = memberData;
+
+	console.log(user_id, name, email, password);
 
 	const { rows } = await pool.query(
 		'INSERT INTO members (user_id, name, email, password) VALUES ($1, $2, $3, $4) RETURNING *',

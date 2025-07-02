@@ -1,4 +1,6 @@
+require('dotenv').config();
 const { BlobServiceClient, StorageSharedKeyCredential } = require('@azure/storage-blob');
+const dotenv = require('dotenv');
 
 if (!process.env.AZURE_STORAGE_CONNECTION_STRING) {
     throw new Error('AZURE_STORAGE_CONNECTION_STRING is not set in environment variables.');

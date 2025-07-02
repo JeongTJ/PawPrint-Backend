@@ -3,7 +3,7 @@ const express = require('express');
 // const cors    = require('cors');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./docs/swagger');
-const { initSchema, databaseCheck } = require('./config/psqlConfig');
+const { initSchema, databaseCheck } = require('./config/dbConfig');
 
 const app  = express();
 const port = process.env.PORT || 8000;
