@@ -15,40 +15,14 @@ const upload = require('../middlewares/upload');
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - loginId
- *               - password
- *             properties:
- *               loginId:
- *                 type: string
- *                 example: "user123"
- *               password:
- *                 type: string
- *                 example: "password123"
+ *             $ref: '#/components/schemas/LoginRequest'
  *     responses:
  *       200:
  *         description: 로그인 성공
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 user:
- *                   $ref: '#/components/schemas/UserResponse'
- *                 tokens:
- *                   type: object
- *                   properties:
- *                     accessToken:
- *                       type: string
- *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_..."
- *                     refreshToken:
- *                       type: string
- *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_..."
- *                 timestamp:
- *                   type: string
- *                   format: date-time
- *                   example: "2025-01-01T00:00:00.000Z"
+ *               $ref: '#/components/schemas/LoginResponse'
  * 
  * /api/auth/check-loginid:
  *   post:
@@ -128,7 +102,7 @@ const upload = require('../middlewares/upload');
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Auth'
+ *               $ref: '#/components/schemas/JwtTokenResponse'
  *       400:
  *         description: 쿼리 파라미터에 id가 없는 경우
  *       404:
@@ -145,14 +119,14 @@ const upload = require('../middlewares/upload');
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/AuthRefresh'
+ *             $ref: '#/components/schemas/JwtTokenRefreshRequest'
  *     responses:
  *       200:
  *         description: 발급된 JWT 토큰
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Auth'
+ *               $ref: '#/components/schemas/JwtTokenResponse'
  *       400:
  *         description: 쿼리 파라미터에 id가 없는 경우
  *       404:

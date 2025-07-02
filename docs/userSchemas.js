@@ -1,7 +1,8 @@
 const UserResponse = {
 	type: 'object',
 	properties: {
-		userId: { type: 'string', example: 'id' },
+		id: { type: 'string', example: 'id' },
+		loginId: { type: 'string', example: 'loginId' },
 		nickname: { type: 'string', example: '홍길동' },
 		profile: { type: 'string', example: 'profile.jpg' },
 		statusNote: { type: 'string', example: '상태 메모' },

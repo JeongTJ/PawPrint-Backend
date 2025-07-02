@@ -14,6 +14,12 @@ const {
 	QnaContentResponse,
 	CommunityContentResponse
 } = require('./contentSchemas');
+const {
+	LoginRequest,
+	LoginResponse,
+	JwtTokenRefreshRequest,
+	JwtTokenResponse,
+} = require('./authSchemas');
 
 const options = {
 	definition: {
@@ -71,21 +77,11 @@ const options = {
 				UserResponse: UserResponse,
 				UserCreateRequest: UserCreateRequest,
 				UserUpdateRequest: UserUpdateRequest,
-				Auth: {
-					type: 'object',
-					properties: {
-						accessToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_...' },
-						refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_...' },
-					},
-					required: ['accessToken', 'refreshToken'],
-				},
-				AuthRefresh: {
-					type: 'object',
-					properties: {
-						refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_...' },
-					},
-					required: ['refreshToken'],
-				},
+
+				JwtTokenRefreshRequest: JwtTokenRefreshRequest,
+				JwtTokenResponse: JwtTokenResponse,
+				LoginRequest: LoginRequest,
+				LoginResponse: LoginResponse,
 			},
 		},
 		security: [{ bearerAuth: [] }],
