@@ -10,7 +10,6 @@ const authMiddleware = (req, res, next) => {
 	const token = authHeader.split(' ')[1];
 	try {
 		const decoded = jwt.verify(token, process.env.JWT_SECRET);
-		console.log("decoded", decoded);
 		if (decoded.type === 'access') {
 			req.user = decoded;
 		} else if (decoded.type === 'refresh') {

@@ -31,7 +31,7 @@ const findByLoginId = async (loginId) => {
 // 특정 사용자 db id로 찾기
 const findById = async (id) => {
 	return await prisma.user.findUnique({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		select: publicUserSelect
 	});
 };
@@ -77,7 +77,7 @@ const update = async (id, userData) => {
 	if (refreshToken !== undefined) updateData.refreshToken = refreshToken;
 	
 	return await prisma.user.update({
-		where: { id: BigInt(id) },
+		where: { id: (id) },
 		data: {
 			...updateData,
 			updatedAt: new Date()
@@ -89,7 +89,7 @@ const update = async (id, userData) => {
 // refresh token만 업데이트 (JWT 갱신용)
 const updateRefreshToken = async (id, refreshToken) => {
 	return await prisma.user.update({
-		where: { id: BigInt(id) },
+		where: { id: (id) },
 		data: { 
 			refreshToken,
 			updatedAt: new Date()
@@ -101,7 +101,7 @@ const updateRefreshToken = async (id, refreshToken) => {
 // 사용자 삭제
 const deleteById = async (id) => {
 	return await prisma.user.delete({
-		where: { id: BigInt(id) },
+		where: { id: (id) },
 		select: publicUserSelect
 	});
 };
@@ -114,6 +114,40 @@ const existsByLoginId = async (loginId) => {
 	return count > 0;
 };
 
+// ========== 로그인 플로우 관련 함수들 ==========
+
+// 회원가입: 사용자와 반려동물 정보 동시 생성 (트랜잭션)
+const createUserWithPet = async (userData, petData) => {
+	const result = await prisma.$transaction(async (tx) => {
+		// 1. 사용자 생성
+		const newUser = await tx.user.create({
+			data: {
+				loginId: userData.loginId,
+				password: userData.password,
+				nickname: userData.nickname,
+				statusNote: userData.statusNote,
+				profile: userData.profile,
+			},
+			select: publicUserSelect
+		});
+
+		// 2. 반려동물 생성
+		const newPet = await tx.pet.create({
+			data: {
+				userId: newUser.id,
+				name: petData.name,
+				birthDate: petData.birthDate,
+				gender: petData.gender,
+				profile: petData.profile,
+			}
+		});
+
+		return { user: newUser, pet: newPet };
+	});
+
+	return result;
+};
+
 module.exports = {
 	findAll,
 	findByLoginId,
@@ -123,5 +157,7 @@ module.exports = {
 	update,
 	updateRefreshToken,
 	deleteById,
-	existsByLoginId
+	existsByLoginId,
+	// 로그인 플로우 관련
+	createUserWithPet
 }; 

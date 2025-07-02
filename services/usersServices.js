@@ -43,10 +43,58 @@ const findByLoginId = async (loginId) => {
 	return user;
 };
 
+// ========== 로그인 플로우 관련 함수들 ==========
+
+// 사용자 인증 (로그인)
+const authenticateUser = async (loginId, password) => {
+	const user = await usersRepository.findByLoginIdWithPassword(loginId);
+	
+	if (!user) {
+		const error = new Error('INVALID_CREDENTIALS');
+		error.statusCode = 401;
+		throw error;
+	}
+
+	// 비밀번호 확인
+	const isValidPassword = await bcrypt.compare(password, user.password);
+	if (!isValidPassword) {
+		const error = new Error('INVALID_CREDENTIALS');
+		error.statusCode = 401;
+		throw error;
+	}
+
+	// 비밀번호 제거한 사용자 정보 반환
+	const { password: _, ...userWithoutPassword } = user;
+	return userWithoutPassword;
+};
+
+// 아이디 중복 확인
+const checkLoginIdExists = async (loginId) => {
+	const user = await usersRepository.findByLoginId(loginId);
+	return !!user; // boolean 반환
+};
+
+// 회원가입 (사용자 + 반려동물 정보)
+const registerUserWithPet = async (registerData) => {
+	const { pet, ...userData } = registerData;
+	
+	// 비밀번호 해싱
+	const saltRounds = 10;
+	const salt = await bcrypt.genSalt(saltRounds);
+	userData.password = await bcrypt.hash(userData.password, salt);
+	
+	// 트랜잭션으로 사용자와 반려동물 정보 동시 생성
+	return await usersRepository.createUserWithPet(userData, pet);
+};
+
 module.exports = { 
 	findAll, 
 	create, 
 	update, 
 	findByLoginId, 
-	findById 
+	findById,
+	// 로그인 플로우 관련
+	authenticateUser,
+	checkLoginIdExists,
+	registerUserWithPet
 }; 

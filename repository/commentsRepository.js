@@ -38,7 +38,7 @@ const findAll = async () => {
 // 특정 콘텐츠의 댓글들 조회
 const findByContentId = async (contentId) => {
 	return await prisma.comment.findMany({
-		where: { contentId: BigInt(contentId) },
+		where: { contentId: parseInt(contentId) },
 		include: {
 			user: {
 				select: {
@@ -67,7 +67,7 @@ const findByContentId = async (contentId) => {
 // 특정 사용자의 댓글들 조회
 const findByUserId = async (userId) => {
 	return await prisma.comment.findMany({
-		where: { userId: BigInt(userId) },
+		where: { userId: parseInt(userId) },
 		include: {
 			content: {
 				select: {
@@ -85,7 +85,7 @@ const findByUserId = async (userId) => {
 // ID로 특정 댓글 조회
 const findById = async (id) => {
 	return await prisma.comment.findUnique({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		include: {
 			user: {
 				select: {
@@ -125,8 +125,8 @@ const create = async (commentData) => {
 		// 댓글 생성
 		const comment = await tx.comment.create({
 			data: {
-				userId: BigInt(userId),
-				contentId: BigInt(contentId),
+				userId: parseInt(userId),
+				contentId: parseInt(contentId),
 				body
 			},
 			include: {
@@ -143,7 +143,7 @@ const create = async (commentData) => {
 		
 		// 콘텐츠의 댓글 수 증가
 		await tx.content.update({
-			where: { id: BigInt(contentId) },
+			where: { id: parseInt(contentId) },
 			data: {
 				commentsCount: {
 					increment: 1
@@ -162,8 +162,8 @@ const update = async (id, commentData, userId) => {
 	
 	return await prisma.comment.update({
 		where: {
-			id: BigInt(id),
-			userId: BigInt(userId) // 본인만 수정 가능
+			id: parseInt(id),
+			userId: parseInt(userId) // 본인만 수정 가능
 		},
 		data: {
 			body,
@@ -188,8 +188,8 @@ const deleteById = async (id, userId) => {
 		// 삭제할 댓글 조회
 		const commentToDelete = await tx.comment.findUnique({
 			where: {
-				id: BigInt(id),
-				userId: BigInt(userId) // 본인만 삭제 가능
+				id: parseInt(id),
+				userId: parseInt(userId) // 본인만 삭제 가능
 			}
 		});
 		
@@ -199,7 +199,7 @@ const deleteById = async (id, userId) => {
 		
 		// 댓글 삭제 (CASCADE로 좋아요도 함께 삭제됨)
 		const deletedComment = await tx.comment.delete({
-			where: { id: BigInt(id) }
+			where: { id: parseInt(id) }
 		});
 		
 		// 콘텐츠의 댓글 수 감소
@@ -224,8 +224,8 @@ const addLike = async (commentId, userId) => {
 		const existingLike = await tx.commentLike.findUnique({
 			where: {
 				userId_commentId: {
-					userId: BigInt(userId),
-					commentId: BigInt(commentId)
+					userId: parseInt(userId),
+					commentId: parseInt(commentId)
 				}
 			}
 		});
@@ -237,8 +237,8 @@ const addLike = async (commentId, userId) => {
 		// 좋아요 추가
 		const like = await tx.commentLike.create({
 			data: {
-				userId: BigInt(userId),
-				commentId: BigInt(commentId)
+				userId: parseInt(userId),
+				commentId: parseInt(commentId)
 			}
 		});
 		
@@ -255,8 +255,8 @@ const removeLike = async (commentId, userId) => {
 		const deletedLike = await tx.commentLike.delete({
 			where: {
 				userId_commentId: {
-					userId: BigInt(userId),
-					commentId: BigInt(commentId)
+					userId: parseInt(userId),
+					commentId: parseInt(commentId)
 				}
 			}
 		});
@@ -272,8 +272,8 @@ const hasLiked = async (commentId, userId) => {
 	const like = await prisma.commentLike.findUnique({
 		where: {
 			userId_commentId: {
-				userId: BigInt(userId),
-				commentId: BigInt(commentId)
+				userId: parseInt(userId),
+				commentId: parseInt(commentId)
 			}
 		}
 	});
@@ -284,7 +284,7 @@ const hasLiked = async (commentId, userId) => {
 // 댓글의 좋아요 목록 조회
 const getLikes = async (commentId) => {
 	return await prisma.commentLike.findMany({
-		where: { commentId: BigInt(commentId) },
+		where: { commentId: parseInt(commentId) },
 		include: {
 			user: {
 				select: {

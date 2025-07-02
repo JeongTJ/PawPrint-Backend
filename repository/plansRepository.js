@@ -22,7 +22,7 @@ const findAll = async () => {
 // 특정 사용자의 계획들 조회
 const findByUserId = async (userId) => {
 	return await prisma.plan.findMany({
-		where: { userId: BigInt(userId) },
+		where: { userId: parseInt(userId) },
 		include: {
 			missions: {
 				orderBy: { missionOrder: 'asc' }
@@ -35,7 +35,7 @@ const findByUserId = async (userId) => {
 // 특정 계획 조회 (Read)
 const findById = async (id) => {
 	return await prisma.plan.findUnique({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		include: {
 			user: {
 				select: {
@@ -58,7 +58,7 @@ const create = async (planData) => {
 	
 	return await prisma.plan.create({
 		data: {
-			userId: BigInt(userId),
+			userId: parseInt(userId),
 			title,
 			date: new Date(date),
 			time: time ? new Date(`1970-01-01T${time}:00.000Z`) : null,
@@ -83,7 +83,7 @@ const update = async (id, planData) => {
 	if (isChecked !== undefined) updateData.isChecked = isChecked;
 	
 	return await prisma.plan.update({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		data: {
 			...updateData,
 			updatedAt: new Date()
@@ -99,7 +99,7 @@ const update = async (id, planData) => {
 // 계획 체크 상태 토글
 const toggleCheck = async (id) => {
 	const currentPlan = await prisma.plan.findUnique({
-		where: { id: BigInt(id) }
+		where: { id: parseInt(id) }
 	});
 	
 	if (!currentPlan) {
@@ -107,7 +107,7 @@ const toggleCheck = async (id) => {
 	}
 	
 	return await prisma.plan.update({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		data: {
 			isChecked: !currentPlan.isChecked,
 			updatedAt: new Date()
@@ -120,9 +120,9 @@ const toggleCheck = async (id) => {
 
 // 계획 삭제 (Delete) - CASCADE로 미션도 함께 삭제됨
 const remove = async (id, userId = null) => {
-	const whereCondition = { id: BigInt(id) };
+	const whereCondition = { id: parseInt(id) };
 	if (userId) {
-		whereCondition.userId = BigInt(userId);
+		whereCondition.userId = parseInt(userId);
 	}
 	
 	const deletedPlan = await prisma.plan.delete({
@@ -139,7 +139,7 @@ const remove = async (id, userId = null) => {
 const findByDate = async (userId, date) => {
 	return await prisma.plan.findMany({
 		where: {
-			userId: BigInt(userId),
+			userId: parseInt(userId),
 			date: new Date(date)
 		},
 		include: {
@@ -155,7 +155,7 @@ const findByDate = async (userId, date) => {
 const findByDateRange = async (userId, startDate, endDate) => {
 	return await prisma.plan.findMany({
 		where: {
-			userId: BigInt(userId),
+			userId: parseInt(userId),
 			date: {
 				gte: new Date(startDate),
 				lte: new Date(endDate)
@@ -177,7 +177,7 @@ const findByDateRange = async (userId, startDate, endDate) => {
 const findIncomplete = async (userId) => {
 	return await prisma.plan.findMany({
 		where: {
-			userId: BigInt(userId),
+			userId: parseInt(userId),
 			isChecked: false
 		},
 		include: {

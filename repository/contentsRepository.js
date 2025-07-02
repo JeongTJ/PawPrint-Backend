@@ -141,7 +141,7 @@ const findByContentType = async (contentType) => {
 // 특정 사용자의 게시물을 미디어와 함께 찾기
 const findByUserId = async (userId) => {
 	const contents = await prisma.content.findMany({
-		where: { userId: BigInt(userId) },
+		where: { userId: parseInt(userId) },
 		include: {
 			media: {
 				orderBy: { id: 'asc' }
@@ -160,7 +160,7 @@ const findByUserId = async (userId) => {
 	
 	// 최신 데이터 재조회
 	return await prisma.content.findMany({
-		where: { userId: BigInt(userId) },
+		where: { userId: parseInt(userId) },
 		include: {
 			media: {
 				orderBy: { id: 'asc' }
@@ -187,7 +187,7 @@ const createWithMedia = async (contentData, mediaFiles = []) => {
 			// 콘텐츠 생성
 			const content = await tx.content.create({
 				data: {
-					userId: BigInt(userId),
+					userId: parseInt(userId),
 					contentType,
 					body
 				}
@@ -239,7 +239,7 @@ const create = async (contentData) => {
 	
 	return await prisma.content.create({
 		data: {
-			userId: BigInt(userId),
+			userId: parseInt(userId),
 			contentType,
 			body
 		},
@@ -252,7 +252,7 @@ const create = async (contentData) => {
 // ID로 특정 게시물을 미디어와 함께 찾기
 const findById = async (id) => {
 	const content = await prisma.content.findUnique({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		include: {
 			media: {
 				orderBy: { id: 'asc' }
@@ -269,7 +269,7 @@ const findById = async (id) => {
 	
 	// 최신 데이터 재조회
 	return await prisma.content.findUnique({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		include: {
 			media: {
 				orderBy: { id: 'asc' }
@@ -287,7 +287,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 		const result = await prisma.$transaction(async (tx) => {
 			// 현재 콘텐츠와 미디어 정보 조회
 			const currentContent = await tx.content.findUnique({
-				where: { id: BigInt(id) },
+				where: { id: parseInt(id) },
 				include: { media: true }
 			});
 			
@@ -305,7 +305,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 			
 			// 콘텐츠 업데이트
 			const updatedContent = await tx.content.update({
-				where: { id: BigInt(id) },
+				where: { id: parseInt(id) },
 				data: {
 					body: contentData.body,
 					updatedAt: new Date()
@@ -316,7 +316,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 			if (uploadedFileUrls.length > 0) {
 				// 기존 미디어 삭제
 				await tx.media.deleteMany({
-					where: { contentId: BigInt(id) }
+					where: { contentId: parseInt(id) }
 				});
 				
 				// 새 미디어 추가
@@ -324,7 +324,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 				for (const fileUrl of uploadedFileUrls) {
 					const media = await tx.media.create({
 						data: {
-							contentId: BigInt(id),
+							contentId: parseInt(id),
 							fileUrl
 						}
 					});
@@ -377,7 +377,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 // 미디어 없이 콘텐츠만 업데이트
 const update = async (id, contentData) => {
 	return await prisma.content.update({
-		where: { id: BigInt(id) },
+		where: { id: parseInt(id) },
 		data: {
 			body: contentData.body,
 			updatedAt: new Date()
@@ -395,8 +395,8 @@ const deleteById = async (id, userId) => {
 			// 삭제할 콘텐츠와 미디어 조회
 			const contentToDelete = await tx.content.findUnique({
 				where: { 
-					id: BigInt(id),
-					userId: BigInt(userId) 
+					id: parseInt(id),
+					userId: parseInt(userId) 
 				},
 				include: { media: true }
 			});
@@ -409,7 +409,7 @@ const deleteById = async (id, userId) => {
 			
 			// DB에서 삭제 (CASCADE로 관련 데이터 자동 삭제)
 			await tx.content.delete({
-				where: { id: BigInt(id) }
+				where: { id: parseInt(id) }
 			});
 			
 			return { deletedContent: contentToDelete, mediaUrls };
@@ -437,16 +437,16 @@ const deleteById = async (id, userId) => {
 // 특정 콘텐츠의 미디어만 조회
 const findMediaByContentId = async (contentId) => {
 	const media = await prisma.media.findMany({
-		where: { contentId: BigInt(contentId) },
+		where: { contentId: parseInt(contentId) },
 		orderBy: { id: 'asc' }
 	});
 	
 	// 만료된 SAS URL 갱신
-	await refreshExpiredSasUrls([BigInt(contentId)]);
+	await refreshExpiredSasUrls([parseInt(contentId)]);
 	
 	// 최신 데이터 재조회
 	return await prisma.media.findMany({
-		where: { contentId: BigInt(contentId) },
+		where: { contentId: parseInt(contentId) },
 		orderBy: { id: 'asc' }
 	});
 };
@@ -458,8 +458,8 @@ const deleteMediaById = async (mediaId, contentId) => {
 			// 삭제할 미디어 조회
 			const mediaToDelete = await tx.media.findUnique({
 				where: { 
-					id: BigInt(mediaId),
-					contentId: BigInt(contentId)
+					id: parseInt(mediaId),
+					contentId: parseInt(contentId)
 				}
 			});
 			
@@ -469,7 +469,7 @@ const deleteMediaById = async (mediaId, contentId) => {
 			
 			// DB에서 삭제
 			await tx.media.delete({
-				where: { id: BigInt(mediaId) }
+				where: { id: parseInt(mediaId) }
 			});
 			
 			return mediaToDelete;
@@ -494,14 +494,14 @@ const deleteMediaById = async (mediaId, contentId) => {
 // SAS URL 수동 재생성
 const regenerateSasUrlsForContent = async (contentId) => {
 	const media = await prisma.media.findMany({
-		where: { contentId: BigInt(contentId) }
+		where: { contentId: parseInt(contentId) }
 	});
 	
 	if (media.length === 0) {
 		return { message: '미디어가 없습니다' };
 	}
 	
-	await refreshExpiredSasUrls([BigInt(contentId)]);
+	await refreshExpiredSasUrls([parseInt(contentId)]);
 	
 	return { 
 		success: true, 
@@ -517,8 +517,8 @@ const addLike = async (userId, contentId) => {
 		// 좋아요 추가
 		const like = await tx.contentLike.create({
 			data: {
-				userId: BigInt(userId),
-				contentId: BigInt(contentId)
+				userId: parseInt(userId),
+				contentId: parseInt(contentId)
 			},
 			include: {
 				user: {
@@ -534,7 +534,7 @@ const addLike = async (userId, contentId) => {
 		
 		// 콘텐츠의 좋아요 수 증가
 		await tx.content.update({
-			where: { id: BigInt(contentId) },
+			where: { id: parseInt(contentId) },
 			data: {
 				likesCount: {
 					increment: 1
@@ -554,15 +554,15 @@ const removeLike = async (userId, contentId) => {
 		const like = await tx.contentLike.delete({
 			where: {
 				userId_contentId: {
-					userId: BigInt(userId),
-					contentId: BigInt(contentId)
+					userId: parseInt(userId),
+					contentId: parseInt(contentId)
 				}
 			}
 		});
 		
 		// 콘텐츠의 좋아요 수 감소
 		await tx.content.update({
-			where: { id: BigInt(contentId) },
+			where: { id: parseInt(contentId) },
 			data: {
 				likesCount: {
 					decrement: 1
@@ -580,8 +580,8 @@ const isLikedByUser = async (userId, contentId) => {
 	const like = await prisma.contentLike.findUnique({
 		where: {
 			userId_contentId: {
-				userId: BigInt(userId),
-				contentId: BigInt(contentId)
+				userId: parseInt(userId),
+				contentId: parseInt(contentId)
 			}
 		}
 	});
@@ -591,7 +591,7 @@ const isLikedByUser = async (userId, contentId) => {
 // 특정 컨텐츠의 좋아요 목록 조회
 const getLikesByContentId = async (contentId) => {
 	return await prisma.contentLike.findMany({
-		where: { contentId: BigInt(contentId) },
+		where: { contentId: parseInt(contentId) },
 		include: {
 			user: {
 				select: {
@@ -609,7 +609,7 @@ const getLikesByContentId = async (contentId) => {
 // 사용자가 좋아요한 컨텐츠 목록 조회
 const getUserLikedContents = async (userId) => {
 	const likes = await prisma.contentLike.findMany({
-		where: { userId: BigInt(userId) },
+		where: { userId: parseInt(userId) },
 		include: {
 			content: {
 				include: {
@@ -641,8 +641,8 @@ const addComment = async (userId, contentId, body) => {
 		// 댓글 생성
 		const comment = await tx.comment.create({
 			data: {
-				userId: BigInt(userId),
-				contentId: BigInt(contentId),
+				userId: parseInt(userId),
+				contentId: parseInt(contentId),
 				body
 			},
 			include: {
@@ -659,7 +659,7 @@ const addComment = async (userId, contentId, body) => {
 		
 		// 콘텐츠의 댓글 수 증가
 		await tx.content.update({
-			where: { id: BigInt(contentId) },
+			where: { id: parseInt(contentId) },
 			data: {
 				commentsCount: {
 					increment: 1
@@ -675,7 +675,7 @@ const addComment = async (userId, contentId, body) => {
 // 특정 컨텐츠의 댓글 목록 조회
 const getCommentsByContentId = async (contentId) => {
 	return await prisma.comment.findMany({
-		where: { contentId: BigInt(contentId) },
+		where: { contentId: parseInt(contentId) },
 		include: {
 			user: {
 				select: {
@@ -693,7 +693,7 @@ const getCommentsByContentId = async (contentId) => {
 // 사용자가 작성한 댓글 목록 조회
 const getUserComments = async (userId) => {
 	return await prisma.comment.findMany({
-		where: { userId: BigInt(userId) },
+		where: { userId: parseInt(userId) },
 		include: {
 			user: {
 				select: {
@@ -720,8 +720,8 @@ const getUserComments = async (userId) => {
 const updateComment = async (commentId, userId, body) => {
 	return await prisma.comment.update({
 		where: { 
-			id: BigInt(commentId),
-			userId: BigInt(userId) // 작성자만 수정 가능
+			id: parseInt(commentId),
+			userId: parseInt(userId) // 작성자만 수정 가능
 		},
 		data: {
 			body,
@@ -746,8 +746,8 @@ const deleteComment = async (commentId, userId) => {
 		// 삭제할 댓글 조회
 		const commentToDelete = await tx.comment.findUnique({
 			where: {
-				id: BigInt(commentId),
-				userId: BigInt(userId) // 작성자만 삭제 가능
+				id: parseInt(commentId),
+				userId: parseInt(userId) // 작성자만 삭제 가능
 			}
 		});
 		
@@ -757,7 +757,7 @@ const deleteComment = async (commentId, userId) => {
 		
 		// 댓글 삭제
 		const deletedComment = await tx.comment.delete({
-			where: { id: BigInt(commentId) }
+			where: { id: parseInt(commentId) }
 		});
 		
 		// 콘텐츠의 댓글 수 감소
