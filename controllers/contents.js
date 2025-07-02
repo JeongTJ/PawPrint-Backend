@@ -190,30 +190,83 @@ router.get('/', authMiddleware, async (req, res) => {
 	try {
 		const contents = await contentsServices.findAll();
 		console.log("contents ", contents);
-		res.json(contents);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: contents
+		});
 	} catch (error) {
 		console.error('게시물 목록 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
 router.get('/qna', authMiddleware, async (req, res) => {
 	try {
 		const contents = await contentsServices.findByContentType('qna');
-		res.json(contents);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: contents
+		});
 	} catch (error) {
 		console.error('QNA 게시물 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
 router.get('/community', authMiddleware, async (req, res) => {
 	try {
 		const contents = await contentsServices.findByContentType('community');
-		res.json(contents);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: contents
+		});
 	} catch (error) {
 		console.error('Community 게시물 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
+	}
+});
+
+// GET /api/contents/search - 키워드로 게시물 검색
+router.get('/search', authMiddleware, async (req, res) => {
+	try {
+		const { keyword } = req.query;
+		
+		const contents = await contentsServices.searchByKeyword(keyword);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: {
+				data: contents,
+				keyword: keyword,
+				total: contents.length
+			}
+		});
+	} catch (error) {
+		console.error('게시물 검색 오류:', error);
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -221,10 +274,19 @@ router.get('/:id', authMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
 		const content = await contentsServices.findById(id);
-		res.json(content);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: content
+		});
 	} catch (error) {
 		console.error('게시물 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -236,7 +298,11 @@ router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => 
 
 		// 기본 유효성 검사 (서비스에서도 하지만 컨트롤러에서 먼저 체크)
 		if (!contentType || !body) {
-			return res.status(400).json({ message: '필수 필드가 누락되었습니다. (contentType, body)' });
+			return res.status(400).json({
+				code: 400,
+				message: '필수 필드가 누락되었습니다. (contentType, body)',
+				result: null
+			});
 		}
 
 		const contentData = { contentType, body, userId };
@@ -259,10 +325,19 @@ router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => 
 			method: req.method
 		});
 
-		res.status(201).json(content);
+		res.status(201).json({
+			code: 200,
+			message: "게시물이 생성되었습니다.",
+			result: content
+		});
 	} catch (error) {
 		console.error('게시물 생성 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -281,10 +356,19 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 			method: req.method
 		});
 
-		res.json(content);
+		res.json({
+			code: 200,
+			message: "게시물이 수정되었습니다.",
+			result: content
+		});
 	} catch (error) {
 		console.error('게시물 수정 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -298,10 +382,19 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 		// 게시물 삭제 민감한 행동 로깅
 		logSensitiveAction(req, 'DELETE_CONTENT', id);
 
-		res.json(deletedContent);
+		res.json({
+			code: 200,
+			message: "게시물이 삭제되었습니다.",
+			result: deletedContent
+		});
 	} catch (error) {
 		console.error('게시물 삭제 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -314,14 +407,19 @@ router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 		// 권한 확인: 게시물 작성자만 갱신 가능
 		const content = await contentsServices.findById(id);
 		if (content.userId !== userId) {
-			return res.status(403).json({ message: '갱신 권한이 없습니다.' });
+			return res.status(403).json({
+				code: 400,
+				message: '갱신 권한이 없습니다.',
+				result: null
+			});
 		}
 		
 		// 미디어가 없으면 빈 배열 반환
 		if (!content.media || content.media.length === 0) {
-			return res.json({ 
+			return res.json({
+				code: 200,
 				message: '갱신할 미디어가 없습니다.',
-				media: []
+				result: { media: [] }
 			});
 		}
 		
@@ -332,9 +430,10 @@ router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 		);
 		
 		if (expiredUrls.length === 0) {
-			return res.json({ 
+			return res.json({
+				code: 200,
 				message: '만료된 SAS URL이 없습니다.',
-				media: content.media
+				result: { media: content.media }
 			});
 		}
 		
@@ -365,10 +464,13 @@ router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 			const updatedContent = await contentsServices.findById(id);
 			
 			res.json({
+				code: 200,
 				message: `${regenerateResult.success.length}개의 SAS URL이 갱신되었습니다.`,
-				refreshed_count: regenerateResult.success.length,
-				failed_count: regenerateResult.failed.length,
-				media: updatedContent.media
+				result: {
+					refreshed_count: regenerateResult.success.length,
+					failed_count: regenerateResult.failed.length,
+					media: updatedContent.media
+				}
 			});
 			
 		} catch (dbError) {
@@ -380,7 +482,12 @@ router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 		
 	} catch (error) {
 		console.error('SAS URL 갱신 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -453,10 +560,19 @@ router.post('/:id/likes', authMiddleware, async (req, res) => {
 			method: req.method
 		});
 
-		res.json(result);
+		res.json({
+			code: 200,
+			message: result.isLiked ? "좋아요를 추가했습니다." : "좋아요를 취소했습니다.",
+			result: result
+		});
 	} catch (error) {
 		console.error('좋아요 토글 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -466,10 +582,19 @@ router.get('/:id/likes', authMiddleware, async (req, res) => {
 		const { id } = req.params;
 		
 		const likes = await contentsServices.getContentLikes(id);
-		res.json(likes);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: likes
+		});
 	} catch (error) {
 		console.error('좋아요 목록 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -547,10 +672,19 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
 			method: req.method
 		});
 
-		res.status(201).json(comment);
+		res.status(201).json({
+			code: 200,
+			message: "댓글이 작성되었습니다.",
+			result: comment
+		});
 	} catch (error) {
 		console.error('댓글 작성 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -560,10 +694,19 @@ router.get('/:id/comments', authMiddleware, async (req, res) => {
 		const { id } = req.params;
 		
 		const comments = await contentsServices.getContentComments(id);
-		res.json(comments);
+		res.json({
+			code: 200,
+			message: "성공했습니다.",
+			result: comments
+		});
 	} catch (error) {
 		console.error('댓글 목록 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 

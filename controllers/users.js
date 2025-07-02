@@ -83,16 +83,38 @@ const { authMiddleware } = require('../middlewares/auth');
  */
 
 router.get('/', async (req, res) => {
-	const users = await usersServices.findAll();
-	res.json(users);
+	try {
+		const users = await usersServices.findAll();
+		res.json({
+			code: 200,
+			message: "사용자 목록을 성공적으로 조회했습니다.",
+			result: users
+		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
 });
 
 router.post('/', async (req, res) => {
 	try {
 		const user = await usersServices.create(req.body);
-		res.status(201).json(user);
+		res.status(201).json({
+			code: 200,
+			message: "사용자가 성공적으로 생성되었습니다.",
+			result: user
+		});
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
 	}
 });
 
@@ -103,9 +125,18 @@ router.get('/me', authMiddleware, async (req, res) => {
 		const userId = req.user.id; 
 		const user = await usersServices.findById(userId);
 		
-		res.json(user);
+		res.json({
+			code: 200,
+			message: "내 정보를 성공적으로 조회했습니다.",
+			result: user
+		});
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
 	}
 });
 
@@ -113,9 +144,18 @@ router.patch('/me', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id; 
 		const user = await usersServices.update(userId, req.body);
-		res.json(user);
+		res.json({
+			code: 200,
+			message: "내 정보가 성공적으로 수정되었습니다.",
+			result: user
+		});
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
 	}
 });
 
@@ -125,9 +165,18 @@ router.get('/:userId', authMiddleware, async (req, res) => {
 		const { userId } = req.params;
 		const user = await usersServices.findById(userId);
 		
-		res.json(user);
+		res.json({
+			code: 200,
+			message: "사용자 정보를 성공적으로 조회했습니다.",
+			result: user
+		});
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
 	}
 });
 
@@ -175,10 +224,19 @@ router.get('/me/likes', authMiddleware, async (req, res) => {
 		const contentsServices = require('../services/contentsServices');
 		
 		const likedContents = await contentsServices.getUserLikedContents(userId);
-		res.json(likedContents);
+		res.json({
+			code: 200,
+			message: "좋아요한 게시물 목록을 성공적으로 조회했습니다.",
+			result: likedContents
+		});
 	} catch (error) {
 		console.error('좋아요한 게시물 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
 	}
 });
 
@@ -189,10 +247,19 @@ router.get('/me/comments', authMiddleware, async (req, res) => {
 		const contentsServices = require('../services/contentsServices');
 		
 		const userComments = await contentsServices.getUserComments(userId);
-		res.json(userComments);
+		res.json({
+			code: 200,
+			message: "내 댓글 목록을 성공적으로 조회했습니다.",
+			result: userComments
+		});
 	} catch (error) {
 		console.error('내 댓글 목록 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
 	}
 });
 

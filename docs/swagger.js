@@ -12,13 +12,23 @@ const {
 	ContentUpdateWithMediaRequest,
 	ErrorResponse,
 	QnaContentResponse,
-	CommunityContentResponse
+	CommunityContentResponse,
+	ContentListResponse,
+	QnaContentListResponse,
+	CommunityContentListResponse
 } = require('./contentSchemas');
 const {
 	LoginRequest,
 	LoginResponse,
 	JwtTokenRefreshRequest,
 	JwtTokenResponse,
+	CheckLoginIdResponse,
+	RegisterResponse,
+	LoginData,
+	JwtTokenData,
+	CheckLoginIdData,
+	RegisterData,
+	PetInfo,
 } = require('./authSchemas');
 
 const options = {
@@ -44,6 +54,28 @@ const options = {
 				},
 			},
 			schemas: {
+				// ==================== Base Response Schemas ====================
+				BaseResponse: {
+					type: 'object',
+					properties: {
+						code: {
+							type: 'integer',
+							example: 1,
+							description: '응답 코드 (1: 성공, 0: 실패)'
+						},
+						message: {
+							type: 'string',
+							example: '성공했습니다.',
+							description: '응답 메시지'
+						},
+						result: {
+							description: '실제 데이터'
+						}
+					},
+					required: ['code', 'message', 'result']
+				},
+				
+				// ==================== Plan Schemas ====================
 				Plan: {                // ← 여기!
 					type: 'object',
 					properties: {
@@ -64,24 +96,39 @@ const options = {
 					required: ['title', 'date'],
 				},
 
-				// Content Schemas
+				// Content Schemas (단일)
 				MediaResponse: MediaResponse,
 				ContentWithMediaResponse: ContentWithMediaResponse,
+				QnaContentResponse: QnaContentResponse,
+				CommunityContentResponse: CommunityContentResponse,
+				ErrorResponse: ErrorResponse,
+				
+				// Content Schemas (목록)
+				ContentListResponse: ContentListResponse,
+				QnaContentListResponse: QnaContentListResponse,
+				CommunityContentListResponse: CommunityContentListResponse,
+				
+				// Content Request Schemas
 				ContentCreateRequest: ContentCreateRequest,
 				ContentUpdateRequest: ContentUpdateRequest,
 				ContentUpdateWithMediaRequest: ContentUpdateWithMediaRequest,
-				ErrorResponse: ErrorResponse,
-				QnaContentResponse: QnaContentResponse,
-				CommunityContentResponse: CommunityContentResponse,
 
 				UserResponse: UserResponse,
 				UserCreateRequest: UserCreateRequest,
 				UserUpdateRequest: UserUpdateRequest,
 
+				// Auth Schemas
 				JwtTokenRefreshRequest: JwtTokenRefreshRequest,
 				JwtTokenResponse: JwtTokenResponse,
 				LoginRequest: LoginRequest,
 				LoginResponse: LoginResponse,
+				CheckLoginIdResponse: CheckLoginIdResponse,
+				RegisterResponse: RegisterResponse,
+				LoginData: LoginData,
+				JwtTokenData: JwtTokenData,
+				CheckLoginIdData: CheckLoginIdData,
+				RegisterData: RegisterData,
+				PetInfo: PetInfo,
 			},
 		},
 		security: [{ bearerAuth: [] }],

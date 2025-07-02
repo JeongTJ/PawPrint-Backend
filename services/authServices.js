@@ -44,14 +44,14 @@ const generateTokens = async (id) => {
 		{ expiresIn: '1h',}
 	);
 	
-	await usersServices.update(user.id, { refresh_token: refreshToken });
+	await usersServices.update(user.id, { refreshToken: refreshToken });
 	
 	return { refreshToken, accessToken };
 }
 
 const refreshToken = async (refreshToken) => {
 	const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-	const user = await usersServices.findById(decoded.id);
+	const user = await usersServices.findByIdIncludeRefreshToken(decoded.id);
 	
 	if (!user) {
 		const error = new Error(`user with id ${decoded.id} not found.`);
@@ -64,10 +64,10 @@ const refreshToken = async (refreshToken) => {
 		error.statusCode = 401;
 		throw error;
 	}
-	
-	if (user.refresh_token !== refreshToken) {
+
+	if (user.refreshToken !== refreshToken) {
 		const error = new Error('Invalid refresh token.');
-		error.statusCode = 401;
+		error.statusCode = 402;
 		throw error;
 	}
 	
@@ -92,7 +92,7 @@ const refreshToken = async (refreshToken) => {
 		process.env.JWT_SECRET,
 		{ expiresIn: '1d' }
 	);
-	await usersServices.update(user.id, { refresh_token: newRefreshToken });
+	await usersServices.update(user.id, { refreshToken: newRefreshToken });
 	
 	return { newRefreshToken, newAccessToken };
 }

@@ -38,6 +38,16 @@ const findById = async (id) => {
 	return user;
 };
 
+const findByIdIncludeRefreshToken = async (id) => {
+	const user = await usersRepository.findByIdIncludeRefreshToken(id);
+	if (!user) {
+		const error = new Error(`User with id ${id} not found.`);
+		error.statusCode = 404;
+		throw error;
+	}
+	return user;
+};
+
 const findByLoginId = async (loginId) => {
 	const user = await usersRepository.findByLoginId(loginId);
 	return user;
@@ -113,6 +123,7 @@ module.exports = {
 	update, 
 	findByLoginId, 
 	findById,
+	findByIdIncludeRefreshToken,
 	// 로그인 플로우 관련
 	authenticateUser,
 	checkLoginIdExists,

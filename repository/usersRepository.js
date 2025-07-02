@@ -36,6 +36,13 @@ const findById = async (id) => {
 	});
 };
 
+const findByIdIncludeRefreshToken = async (id) => {
+	return await prisma.user.findUnique({
+		where: { id: parseInt(id) },
+		select: { ...publicUserSelect, refreshToken: true }
+	});
+};
+
 // 로그인용 - 패스워드 포함 조회
 const findByLoginIdWithPassword = async (loginId) => {
 	return await prisma.user.findUnique({
@@ -198,6 +205,7 @@ module.exports = {
 	findAll,
 	findByLoginId,
 	findById,
+	findByIdIncludeRefreshToken,
 	findByLoginIdWithPassword,
 	create,
 	update,

@@ -1,3 +1,5 @@
+const { UserResponse } = require('./userSchemas');
+
 // 미디어 스키마
 const MediaResponse = {
 	type: 'object',
@@ -9,8 +11,8 @@ const MediaResponse = {
 	},
 };
 
-// 기본 컨텐츠 응답 (미디어 포함)
-const ContentWithMediaResponse = {
+// 기본 컨텐츠 데이터 (미디어 포함)
+const ContentWithMediaData = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
@@ -39,11 +41,23 @@ const ContentWithMediaResponse = {
 				}
 			]
 		},
+		nickname: UserResponse.properties.nickname,
+		profile: UserResponse.properties.profile,
 	},
 };
 
-// QNA 전용 응답 (미디어 없음)
-const QnaContentResponse = {
+// BaseResponse로 래핑된 컨텐츠 응답
+const ContentWithMediaResponse = {
+	type: 'object',
+	properties: {
+		code: { type: 'integer', example: 1 },
+		message: { type: 'string', example: '성공했습니다.' },
+		result: ContentWithMediaData
+	}
+};
+
+// QNA 전용 데이터 (미디어 없음)
+const QnaContentData = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 2 },
@@ -58,12 +72,24 @@ const QnaContentResponse = {
 			type: 'array',
 			items: MediaResponse,
 			example: []
-		}
+		},
+		nickname: UserResponse.properties.nickname,
+		profile: UserResponse.properties.profile,
 	}
 };
 
-// Community 전용 응답 (미디어 포함 가능)
-const CommunityContentResponse = {
+// BaseResponse로 래핑된 QNA 응답
+const QnaContentResponse = {
+	type: 'object',
+	properties: {
+		code: { type: 'integer', example: 1 },
+		message: { type: 'string', example: '성공했습니다.' },
+		result: QnaContentData
+	}
+};
+
+// Community 전용 데이터 (미디어 포함 가능)
+const CommunityContentData = {
 	type: 'object',
 	properties: {
 		id: { type: 'integer', example: 1 },
@@ -85,7 +111,19 @@ const CommunityContentResponse = {
 					updatedAt: '2024-01-15T10:30:05.000Z'
 				}
 			]
-		}
+		},
+		nickname: UserResponse.properties.nickname,
+		profile: UserResponse.properties.profile,
+	}
+};
+
+// BaseResponse로 래핑된 Community 응답
+const CommunityContentResponse = {
+	type: 'object',
+	properties: {
+		code: { type: 'integer', example: 1 },
+		message: { type: 'string', example: '성공했습니다.' },
+		result: CommunityContentData
 	}
 };
 
@@ -150,25 +188,67 @@ const ContentUpdateWithMediaRequest = {
 	}
 };
 
-// 에러 응답
-const ErrorResponse = {
+// 게시물 목록 응답 (BaseResponse 형태)
+const ContentListResponse = {
 	type: 'object',
 	properties: {
-		message: {
-			type: 'string',
-			example: '게시물을 찾을 수 없습니다.',
-			description: '에러 메시지'
+		code: { type: 'integer', example: 1 },
+		message: { type: 'string', example: '성공했습니다.' },
+		result: {
+			type: 'array',
+			items: ContentWithMediaData
 		}
 	}
 };
 
+// QNA 게시물 목록 응답
+const QnaContentListResponse = {
+	type: 'object',
+	properties: {
+		code: { type: 'integer', example: 1 },
+		message: { type: 'string', example: '성공했습니다.' },
+		result: {
+			type: 'array',
+			items: QnaContentData
+		}
+	}
+};
+
+// Community 게시물 목록 응답
+const CommunityContentListResponse = {
+	type: 'object',
+	properties: {
+		code: { type: 'integer', example: 1 },
+		message: { type: 'string', example: '성공했습니다.' },
+		result: {
+			type: 'array',
+			items: CommunityContentData
+		}
+	}
+};
+
+// 에러 응답 (BaseResponse 형태)
+const ErrorResponse = {
+	type: 'object',
+	properties: {
+		code: { type: 'integer', example: 0 },
+		message: { type: 'string', example: '게시물을 찾을 수 없습니다.' },
+		result: { type: 'null', example: null }
+	}
+};
+
 module.exports = {
-	// 응답 스키마
+	// 응답 스키마 (단일)
 	MediaResponse,
 	ContentWithMediaResponse,
 	QnaContentResponse,
 	CommunityContentResponse,
 	ErrorResponse,
+	
+	// 응답 스키마 (목록)
+	ContentListResponse,
+	QnaContentListResponse,
+	CommunityContentListResponse,
 	
 	// 요청 스키마
 	ContentCreateRequest,
