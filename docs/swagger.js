@@ -1,5 +1,9 @@
 const swaggerJsdoc = require('swagger-jsdoc');
-const { Member, MemberView } = require('./memberSchemas');
+const { 
+	UserResponse, 
+	UserCreateRequest, 
+	UserUpdateRequest 
+} = require('./userSchemas');
 const { 
 	MediaResponse,
 	ContentWithMediaResponse,
@@ -17,12 +21,12 @@ const options = {
 			version: '1.0.0',
 			description: 'PawPrint 백엔드 OpenAPI 문서',
 		},
-		servers: [
-			{
-				url: 'http://localhost:8000',
-				description: '로컬 개발 서버',
-			},
-		],
+		// servers: [
+		// 	{
+		// 		url: 'http://localhost:8000',
+		// 		description: '로컬 개발 서버',
+		// 	},
+		// ],
 		components: {
 			securitySchemes: {
 				bearerAuth: {
@@ -60,8 +64,9 @@ const options = {
 				ContentUpdateWithMediaRequest: ContentUpdateWithMediaRequest,
 				ErrorResponse: ErrorResponse,
 
-				Member: Member,
-				MemberView: MemberView,
+				UserResponse: UserResponse,
+				UserCreateRequest: UserCreateRequest,
+				UserUpdateRequest: UserUpdateRequest,
 				Auth: {
 					type: 'object',
 					properties: {

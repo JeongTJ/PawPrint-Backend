@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const membersServices = require('../services/membersServices');
+const usersServices = require('../services/usersServices');
 const jwt = require('jsonwebtoken');
 const authServices = require('../services/authServices');
 
@@ -54,12 +54,6 @@ const authServices = require('../services/authServices');
  *       500:
  *         description: 서버 오류 또는 JWT_SECRET이 설정되지 않은 경우
  */
-
-// router.post('/login', async (req, res) => {
-// 	const { email, password } = req.body;
-// 	const member = await membersServices.findByEmail(email);
-// 	res.json(member);
-// });
 
 // 테스트용 토큰 발급 API
 router.get('/test-token', async (req, res) => {

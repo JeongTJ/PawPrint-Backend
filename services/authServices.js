@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const membersServices = require('./membersServices');
+const usersServices = require('./usersServices');
 
 const generateTokens = async (id) => {
 	if (!id) {
@@ -8,10 +8,10 @@ const generateTokens = async (id) => {
 		throw error;
 	}
 
-	const member = await membersServices.findById(id);
+	const user = await usersServices.findById(id);
 
-	if (!member) {
-		const error = new Error(`Member with id ${id} not found.`);
+	if (!user) {
+		const error = new Error(`user with id ${id} not found.`);
 		error.statusCode = 404;
 		throw error;
 	}
@@ -23,28 +23,28 @@ const generateTokens = async (id) => {
 	}
 
 	const refreshToken = jwt.sign(
-		{ id: parseInt(member.id, 10), type: 'refresh' }, 
+		{ id: parseInt(user.id, 10), type: 'refresh' }, 
 		process.env.JWT_SECRET, 
 		{ expiresIn: '1d',}
 	);
 
 	const accessToken = jwt.sign(
-		{ id: parseInt(member.id, 10), type: 'access'}, 
+		{ id: parseInt(user.id, 10), type: 'access'}, 
 		process.env.JWT_SECRET, 
 		{ expiresIn: '1h',}
 	);
 	
-	await membersServices.update(member.id, { refresh_token: refreshToken });
+	await usersServices.update(user.id, { refresh_token: refreshToken });
 	
 	return { refreshToken, accessToken };
 }
 
 const refreshToken = async (refreshToken) => {
 	const decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
-	const member = await membersServices.findById(decoded.id);
+	const user = await usersServices.findById(decoded.id);
 	
-	if (!member) {
-		const error = new Error(`Member with id ${decoded.id} not found.`);
+	if (!user) {
+		const error = new Error(`user with id ${decoded.id} not found.`);
 		error.statusCode = 404;
 		throw error;
 	}
@@ -55,24 +55,24 @@ const refreshToken = async (refreshToken) => {
 		throw error;
 	}
 	
-	if (member.refresh_token !== refreshToken) {
+	if (user.refresh_token !== refreshToken) {
 		const error = new Error('Invalid refresh token.');
 		error.statusCode = 401;
 		throw error;
 	}
 	
 	const newRefreshToken = jwt.sign(
-		{ id: parseInt(member.id, 10), type: 'refresh' }, 
+		{ id: parseInt(user.id, 10), type: 'refresh' }, 
 		process.env.JWT_SECRET,
 		{ expiresIn: '1d' }
 	);
 	
 	const newAccessToken = jwt.sign(
-		{ id: parseInt(member.id, 10), type: 'access' }, 
+		{ id: parseInt(user.id, 10), type: 'access' }, 
 		process.env.JWT_SECRET,
 		{ expiresIn: '1d' }
 	);
-	await membersServices.update(member.id, { refresh_token: newRefreshToken });
+	await usersServices.update(user.id, { refresh_token: newRefreshToken });
 	
 	return { newRefreshToken, newAccessToken };
 }

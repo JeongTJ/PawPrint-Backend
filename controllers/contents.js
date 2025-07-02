@@ -33,7 +33,7 @@ const upload = require('../middlewares/upload');
  *           schema:
  *             type: object
  *             properties:
- *               content_type:
+ *               contentType:
  *                 type: string
  *                 enum: [qna, community]
  *               body:
@@ -227,18 +227,18 @@ router.get('/:id', authMiddleware, async (req, res) => {
 
 router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => {
 	try {
-		const member_id = req.user.id;
-		const { content_type, body } = req.body;
+		const userId = req.user.id;
+		const { contentType, body } = req.body;
 		const imageFiles = req.files;
 
 		// 기본 유효성 검사 (서비스에서도 하지만 컨트롤러에서 먼저 체크)
-		if (!content_type || !body) {
+		if (!contentType || !body) {
 			return res.status(400).json({
-				message: '필수 필드가 누락되었습니다. (content_type, body)'
+				message: '필수 필드가 누락되었습니다. (contentType, body)'
 			});
 		}
 
-		const contentData = { content_type, body, member_id };
+		const contentData = { contentType, body, userId };
 
 		// 미디어 파일이 있으면 createWithMedia, 없으면 create 사용
 		let content;
@@ -271,9 +271,9 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 router.delete('/:id', authMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
-		const member_id = req.user.id;
+		const userId = req.user.id;
 		
-		const deletedContent = await contentsServices.deleteById(id, member_id);
+		const deletedContent = await contentsServices.deleteById(id, userId);
 		res.json(deletedContent);
 	} catch (error) {
 		console.error('게시물 삭제 오류:', error);
@@ -285,11 +285,11 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
-		const member_id = req.user.id;
+		const userId = req.user.id;
 		
 		// 권한 확인: 게시물 작성자만 갱신 가능
 		const content = await contentsServices.findById(id);
-		if (content.member_id !== member_id) {
+		if (content.userId !== userId) {
 			return res.status(403).json({ message: '갱신 권한이 없습니다.' });
 		}
 		
@@ -356,6 +356,172 @@ router.post('/:id/refresh-sas', authMiddleware, async (req, res) => {
 		
 	} catch (error) {
 		console.error('SAS URL 갱신 오류:', error);
+		res.status(error.statusCode || 500).json({ message: error.message });
+	}
+});
+
+// ==================== 좋아요 관련 API ====================
+
+/**
+ * @openapi
+ * /api/contents/{id}/likes:
+ *   post:
+ *     summary: 게시물 좋아요 토글 (좋아요/취소)
+ *     tags: [Contents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 게시물 ID
+ *     responses:
+ *       200:
+ *         description: 좋아요 처리 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 isLiked:
+ *                   type: boolean
+ *                 like:
+ *                   type: object
+ *   get:
+ *     summary: 특정 게시물의 좋아요 목록 조회
+ *     tags: [Contents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 게시물 ID
+ *     responses:
+ *       200:
+ *         description: 좋아요 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
+
+// POST /api/contents/:id/likes - 좋아요 토글
+router.post('/:id/likes', authMiddleware, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const userId = req.user.id;
+		
+		const result = await contentsServices.toggleLike(userId, id);
+		res.json(result);
+	} catch (error) {
+		console.error('좋아요 토글 오류:', error);
+		res.status(error.statusCode || 500).json({ message: error.message });
+	}
+});
+
+// GET /api/contents/:id/likes - 특정 게시물의 좋아요 목록 조회
+router.get('/:id/likes', authMiddleware, async (req, res) => {
+	try {
+		const { id } = req.params;
+		
+		const likes = await contentsServices.getContentLikes(id);
+		res.json(likes);
+	} catch (error) {
+		console.error('좋아요 목록 조회 오류:', error);
+		res.status(error.statusCode || 500).json({ message: error.message });
+	}
+});
+
+// ==================== 댓글 관련 API ====================
+
+/**
+ * @openapi
+ * /api/contents/{id}/comments:
+ *   post:
+ *     summary: 게시물에 댓글 작성
+ *     tags: [Contents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 게시물 ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               body:
+ *                 type: string
+ *                 description: 댓글 내용
+ *     responses:
+ *       201:
+ *         description: 댓글 작성 완료
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *   get:
+ *     summary: 특정 게시물의 댓글 목록 조회
+ *     tags: [Contents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 게시물 ID
+ *     responses:
+ *       200:
+ *         description: 댓글 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ */
+
+// POST /api/contents/:id/comments - 댓글 작성
+router.post('/:id/comments', authMiddleware, async (req, res) => {
+	try {
+		const { id } = req.params;
+		const userId = req.user.id;
+		const { body } = req.body;
+		
+		const comment = await contentsServices.createComment(userId, id, body);
+		res.status(201).json(comment);
+	} catch (error) {
+		console.error('댓글 작성 오류:', error);
+		res.status(error.statusCode || 500).json({ message: error.message });
+	}
+});
+
+// GET /api/contents/:id/comments - 특정 게시물의 댓글 목록 조회
+router.get('/:id/comments', authMiddleware, async (req, res) => {
+	try {
+		const { id } = req.params;
+		
+		const comments = await contentsServices.getContentComments(id);
+		res.json(comments);
+	} catch (error) {
+		console.error('댓글 목록 조회 오류:', error);
 		res.status(error.statusCode || 500).json({ message: error.message });
 	}
 });
