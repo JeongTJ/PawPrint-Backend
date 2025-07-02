@@ -92,7 +92,7 @@ router.post('/', async (req, res) => {
 		const user = await usersServices.create(req.body);
 		res.status(201).json(user);
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -105,7 +105,7 @@ router.get('/me', authMiddleware, async (req, res) => {
 		
 		res.json(user);
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -115,7 +115,7 @@ router.patch('/me', authMiddleware, async (req, res) => {
 		const user = await usersServices.update(userId, req.body);
 		res.json(user);
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -127,7 +127,7 @@ router.get('/:userId', authMiddleware, async (req, res) => {
 		
 		res.json(user);
 	} catch (error) {
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -178,7 +178,7 @@ router.get('/me/likes', authMiddleware, async (req, res) => {
 		res.json(likedContents);
 	} catch (error) {
 		console.error('좋아요한 게시물 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -192,7 +192,7 @@ router.get('/me/comments', authMiddleware, async (req, res) => {
 		res.json(userComments);
 	} catch (error) {
 		console.error('내 댓글 목록 조회 오류:', error);
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 

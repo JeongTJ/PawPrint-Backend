@@ -2,9 +2,115 @@ const router = require('express').Router();
 const usersServices = require('../services/usersServices');
 const jwt = require('jsonwebtoken');
 const authServices = require('../services/authServices');
+const upload = require('../middlewares/upload');
 
 /**
  * @openapi
+ * /api/auth/login:
+ *   post:
+ *     summary: 로그인
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - loginId
+ *               - password
+ *             properties:
+ *               loginId:
+ *                 type: string
+ *                 example: "user123"
+ *               password:
+ *                 type: string
+ *                 example: "password123"
+ *     responses:
+ *       200:
+ *         description: 로그인 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user:
+ *                   $ref: '#/components/schemas/UserResponse'
+ *                 tokens:
+ *                   type: object
+ *                   properties:
+ *                     accessToken:
+ *                       type: string
+ *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_..."
+ *                     refreshToken:
+ *                       type: string
+ *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_..."
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2025-01-01T00:00:00.000Z"
+ * 
+ * /api/auth/check-loginid:
+ *   post:
+ *     summary: 아이디 중복 확인
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - loginId
+ *             properties:
+ *               loginId:
+ *                 type: string
+ *                 example: "user123"
+ *     responses:
+ *       200:
+ *         description: 사용 가능한 아이디
+ *       409:
+ *         description: 이미 사용 중인 아이디
+ * 
+ * /api/auth/register:
+ *   post:
+ *     summary: 회원가입
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - loginId
+ *               - password
+ *               - nickname
+ *               - petName
+ *               - petGender
+ *             properties:
+ *               loginId:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               nickname:
+ *                 type: string
+ *               statusNote:
+ *                 type: string
+ *               profileImage:
+ *                 type: string
+ *                 format: binary
+ *               petName:
+ *                 type: string
+ *               petBirthDate:
+ *                 type: string
+ *                 format: date
+ *               petGender:
+ *                 type: string
+ *                 enum: [male, female]
+ *               petProfileImage:
+ *                 type: string
+ *                 format: binary
  * /api/auth/test-token:
  *   get:
  *     summary: 테스트용 토큰 발급
@@ -55,6 +161,136 @@ const authServices = require('../services/authServices');
  *         description: 서버 오류 또는 JWT_SECRET이 설정되지 않은 경우
  */
 
+// POST /api/auth/login - 로그인
+router.post('/login', async (req, res) => {
+	try {
+		const { loginId, password } = req.body;
+		// 사용자 인증
+		const user = await usersServices.authenticateUser(loginId, password);
+
+		// 토큰 생성
+		const { refreshToken, accessToken } = await authServices.generateTokens(user.id);
+
+		// 성공 응답
+		res.json({
+				user: {
+					id: user.id,
+					loginId: user.loginId,
+					nickname: user.nickname,
+					statusNote: user.statusNote,
+					profile: user.profile
+				},
+				tokens: {
+					accessToken,
+					refreshToken
+				}});
+
+	} catch (error) {
+		console.error('로그인 오류:', error);
+		// 서버 오류
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+	}
+});
+
+// POST /api/auth/check-loginid - 아이디 중복 확인
+router.post('/check-loginid', async (req, res) => {
+	try {
+		const { loginId } = req.body;
+
+		// 중복 확인
+		const exists = await usersServices.checkLoginIdExists(loginId);
+		
+		if (exists) {
+			return res.status(409).json({ available: false });
+		}
+		// 사용 가능
+		res.json({ available: true });
+
+	} catch (error) {
+		console.error('아이디 중복 확인 오류:', error);
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+	}
+});
+
+// POST /api/auth/register - 회원가입
+router.post('/register', upload.fields([
+	{ name: 'profileImage', maxCount: 1 },
+	{ name: 'petProfileImage', maxCount: 1 }
+]), async (req, res) => {
+	try {
+		const {
+			loginId,
+			password,
+			nickname,
+			statusNote,
+			petName,
+			petBirthDate,
+			petGender
+		} = req.body;
+
+		// 필수 입력값 검증
+		if (!loginId || !password || !nickname || !petName || !petGender) {
+			return res.status(400).json({ message: '필수 정보를 모두 입력해주세요' });
+		}
+
+		// 아이디 중복 확인
+		const exists = await usersServices.checkLoginIdExists(loginId);
+		if (exists) {
+			return res.status(409).json({ message: '이미 사용 중인 아이디입니다' });
+		}
+
+		// 파일 정리 (multipart에서 배열로 오므로 단일 파일로 변환)
+		const files = {
+			profileImage: req.files?.profileImage?.[0],
+			petProfileImage: req.files?.petProfileImage?.[0]
+		};
+
+		// 회원가입 처리 (사용자 + 반려동물 정보 + 프로필 이미지 업로드)
+		const result = await usersServices.registerUserWithPet({
+			// 사용자 정보
+			loginId,
+			password,
+			nickname,
+			statusNote: statusNote || null,
+			// 반려동물 정보
+			pet: {
+				name: petName,
+				birthDate: petBirthDate ? new Date(petBirthDate) : null,
+				gender: petGender
+			}
+		}, files);
+
+		// 토큰 생성
+		const { refreshToken, accessToken } = await authServices.generateTokens(result.user.id);
+
+		// 성공 응답
+		res.status(201).json({
+			user: {
+				id: result.user.id,
+				loginId: result.user.loginId,
+				nickname: result.user.nickname,
+				statusNote: result.user.statusNote,
+				profile: result.user.profile
+			},
+			pet: {
+				id: result.pet.id,
+				name: result.pet.name,
+				birthDate: result.pet.birthDate,
+				gender: result.pet.gender,
+				profile: result.pet.profile
+			},
+			tokens: {
+				accessToken,
+				refreshToken
+			}
+		});
+
+	} catch (error) {
+		console.error('회원가입 오류:', error);
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
+	}
+});
+
 // 테스트용 토큰 발급 API
 router.get('/test-token', async (req, res) => {
 	try {
@@ -64,7 +300,7 @@ router.get('/test-token', async (req, res) => {
 		res.json({ refreshToken, accessToken });
 	} catch (error) {
 		console.error('Error generating test token:', error);
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
@@ -76,7 +312,7 @@ router.post('/refresh-token', async (req, res) => {
 		res.json({ refreshToken: newRefreshToken, accessToken: newAccessToken });
 	} catch (error) {
 		console.error('Error refreshing token:', error);
-		res.status(error.statusCode || 500).json({ error: error.message || 'Internal server error' });
+		res.status(error.statusCode || 500).json({ message: error.message || 'Internal server error' });
 	}
 });
 
