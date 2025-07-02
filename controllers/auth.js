@@ -34,24 +34,21 @@ const upload = require('../middlewares/upload');
  *             schema:
  *               type: object
  *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: "로그인 성공"
- *                 data:
+ *                 user:
+ *                   $ref: '#/components/schemas/UserResponse'
+ *                 tokens:
  *                   type: object
  *                   properties:
- *                     user:
- *                       $ref: '#/components/schemas/UserResponse'
- *                     tokens:
- *                       type: object
- *                       properties:
- *                         accessToken:
- *                           type: string
- *                         refreshToken:
- *                           type: string
+ *                     accessToken:
+ *                       type: string
+ *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_..."
+ *                     refreshToken:
+ *                       type: string
+ *                       example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwiaWF0IjoxNjI5MjgxMjk5LCJleHAiOjE2MjkIjg0ODk5fQ.e_..."
+ *                 timestamp:
+ *                   type: string
+ *                   format: date-time
+ *                   example: "2025-01-01T00:00:00.000Z"
  * 
  * /api/auth/check-loginid:
  *   post:
@@ -187,9 +184,6 @@ router.post('/login', async (req, res) => {
 
 		// 성공 응답
 		res.json({
-			success: true,
-			message: '로그인 성공',
-			data: {
 				user: {
 					id: user.id.toString(),
 					loginId: user.loginId,
@@ -200,10 +194,7 @@ router.post('/login', async (req, res) => {
 				tokens: {
 					accessToken,
 					refreshToken
-				}
-			},
-			timestamp: new Date().toISOString()
-		});
+				}});
 
 	} catch (error) {
 		console.error('로그인 오류:', error);
@@ -257,21 +248,11 @@ router.post('/check-loginid', async (req, res) => {
 		const exists = await usersServices.checkLoginIdExists(loginId);
 		
 		if (exists) {
-			return res.status(409).json({
-				success: false,
-				message: '이미 사용 중인 아이디입니다',
-				data: { available: false },
-				timestamp: new Date().toISOString()
-			});
+			return res.status(409).json({ available: false });
 		}
 
 		// 사용 가능
-		res.json({
-			success: true,
-			message: '사용 가능한 아이디입니다',
-			data: { available: true },
-			timestamp: new Date().toISOString()
-		});
+		res.json({ available: true });
 
 	} catch (error) {
 		console.error('아이디 중복 확인 오류:', error);
