@@ -4,7 +4,11 @@ const authMiddleware = (req, res, next) => {
 	const authHeader = req.headers.authorization;
 
 	if (!authHeader || !authHeader.startsWith('Bearer ')) {
-		return res.status(401).json({ message: 'Authentication token required.' });
+		return res.status(401).json({
+			code: 401,
+			message: 'Authentication token required.',
+			result: null
+		});
 	}
 
 	const token = authHeader.split(' ')[1];
@@ -16,7 +20,11 @@ const authMiddleware = (req, res, next) => {
 			throw new Error();
 		}
 	} catch (error) {
-		return res.status(401).json({ message: 'Invalid or expired token.' });
+		return res.status(401).json({
+			code: 401,
+			message: 'Invalid or expired token.',
+			result: null
+		});
 	}
 	next();
 };

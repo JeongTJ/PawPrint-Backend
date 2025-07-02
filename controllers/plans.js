@@ -77,13 +77,39 @@ const plansServices = require('../services/plansServices');
 
 // GET /api/plans
 router.get('/', async (req, res) => {
-	const plans = await plansServices.findAll();
-	res.json(plans);
+	try {
+		const plans = await plansServices.findAll();
+		res.json({
+			code: 200,
+			message: "계획 목록을 성공적으로 조회했습니다.",
+			result: plans
+		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
 });
 
 router.post('/', async (req, res) => {
-	const plan = await plansServices.create(req.body);
-	res.status(201).json(plan);
+	try {
+		const plan = await plansServices.create(req.body);
+		res.status(201).json({
+			code: 200,
+			message: "계획이 성공적으로 생성되었습니다.",
+			result: plan
+		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
 });
 
 router.get('/:planId', async (req, res) => {
@@ -91,11 +117,23 @@ router.get('/:planId', async (req, res) => {
 		const { planId } = req.params;
 		const plan = await plansServices.findById(planId);
 		if (!plan) {
-			return res.status(404).json({ message: `planId ${planId} Plan not found` });
+			return res.status(404).json({
+				code: 400,
+				message: `planId ${planId} Plan not found`,
+				result: null
+			});
 		}
-		res.json(plan);
+		res.json({
+			code: 200,
+			message: "계획을 성공적으로 조회했습니다.",
+			result: plan
+		});
 	} catch (error) {
-		res.status(500).json({ message: 'Internal server error' });
+		res.status(500).json({
+			code: 500,
+			message: 'Internal server error',
+			result: null
+		});
 	}
 });
 
@@ -103,15 +141,26 @@ router.patch('/:planId', async (req, res) => {
 	try {
 		const { planId } = req.params;
 		const planData = req.body;
-		console.log(plan);
 		console.log(planData);
 		const plan = await plansServices.update(planId, planData);
 		if (!plan) {
-			return res.status(404).json({ message: `planId ${planId} Plan not found` });
+			return res.status(404).json({
+				code: 400,
+				message: `planId ${planId} Plan not found`,
+				result: null
+			});
 		}
-		res.json(plan);
+		res.json({
+			code: 200,
+			message: "계획이 성공적으로 수정되었습니다.",
+			result: plan
+		});
 	} catch (error) {
-		res.status(500).json({ message: 'Internal server error' });
+		res.status(500).json({
+			code: 500,
+			message: 'Internal server error',
+			result: null
+		});
 	}
 });
 

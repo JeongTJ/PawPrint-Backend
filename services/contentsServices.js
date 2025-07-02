@@ -1,9 +1,37 @@
 const contentsRepository = require('../repository/contentsRepository');
+const usersRepository = require('../repository/usersRepository');
 
 // 모든 게시물을 미디어와 함께 찾기
 const findAll = async () => {
 	try {
-		return await contentsRepository.findAll();
+		const contents = await contentsRepository.findAll();
+		
+		if (contents.length === 0) {
+			return contents;
+		}
+		
+		// 유니크한 사용자 ID들 추출
+		const uniqueUserIds = [...new Set(contents.map(content => content.userId))];
+		
+		// 작성자 정보들 한 번에 조회
+		const users = await Promise.all(
+			uniqueUserIds.map(userId => usersRepository.findById(userId))
+		);
+		
+		// userId를 키로 하는 사용자 정보 맵 생성
+		const userMap = {};
+		users.forEach(user => {
+			if (user) userMap[user.id] = user;
+		});
+		
+		// 각 게시물에 작성자 정보 추가 (nickname, profile만)
+		const contentsWithUser = contents.map(content => ({
+			...content,
+			nickname: userMap[content.userId] ? userMap[content.userId].nickname : null,
+			profile: userMap[content.userId] ? userMap[content.userId].profile : null
+		}));
+		
+		return contentsWithUser;
 	} catch (error) {
 		console.error('모든 게시물 조회 중 오류:', error);
 		throw new Error('게시물 목록 조회에 실패했습니다.');
@@ -20,7 +48,34 @@ const findByContentType = async (content_type) => {
 			throw error;
 		}
 		
-		return await contentsRepository.findByContentType(content_type);
+		const contents = await contentsRepository.findByContentType(content_type);
+		
+		if (contents.length === 0) {
+			return contents;
+		}
+		
+		// 유니크한 사용자 ID들 추출
+		const uniqueUserIds = [...new Set(contents.map(content => content.userId))];
+		
+		// 작성자 정보들 한 번에 조회
+		const users = await Promise.all(
+			uniqueUserIds.map(userId => usersRepository.findById(userId))
+		);
+		
+		// userId를 키로 하는 사용자 정보 맵 생성
+		const userMap = {};
+		users.forEach(user => {
+			if (user) userMap[user.id] = user;
+		});
+		
+		// 각 게시물에 작성자 정보 추가 (nickname, profile만)
+		const contentsWithUser = contents.map(content => ({
+			...content,
+			nickname: userMap[content.userId] ? userMap[content.userId].nickname : null,
+			profile: userMap[content.userId] ? userMap[content.userId].profile : null
+		}));
+		
+		return contentsWithUser;
 	} catch (error) {
 		if (error.statusCode) throw error;
 		console.error('게시물 타입별 조회 중 오류:', error);
@@ -37,7 +92,23 @@ const findByUserId = async (userId) => {
 			throw error;
 		}
 		
-		return await contentsRepository.findByUserId(userId);
+		const contents = await contentsRepository.findByUserId(userId);
+		
+		if (contents.length === 0) {
+			return contents;
+		}
+		
+		// 작성자 정보 조회 (모든 게시물이 같은 사용자의 것이므로 한 번만 조회)
+		const user = await usersRepository.findById(parseInt(userId));
+		
+		// 각 게시물에 작성자 정보 추가 (nickname, profile만)
+		const contentsWithUser = contents.map(content => ({
+			...content,
+			nickname: user ? user.nickname : null,
+			profile: user ? user.profile : null
+		}));
+		
+		return contentsWithUser;
 	} catch (error) {
 		if (error.statusCode) throw error;
 		console.error('사용자별 게시물 조회 중 오류:', error);
@@ -62,7 +133,17 @@ const findById = async (id) => {
 			throw error;
 		}
 		
-		return content;
+		// 작성자 정보 조회
+		const user = await usersRepository.findById(content.userId);
+		
+		// 게시물에 작성자 정보 추가 (nickname, profile만)
+		const contentWithUser = {
+			...content,
+			nickname: user ? user.nickname : null,
+			profile: user ? user.profile : null
+		};
+		
+		return contentWithUser;
 	} catch (error) {
 		if (error.statusCode) throw error;
 		console.error('게시물 단일 조회 중 오류:', error);

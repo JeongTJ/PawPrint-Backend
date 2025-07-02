@@ -75,10 +75,19 @@ router.patch('/:commentId', authMiddleware, async (req, res) => {
 		const { body } = req.body;
 		
 		const updatedComment = await contentsServices.updateComment(commentId, userId, body);
-		res.json(updatedComment);
+		res.json({
+			code: 200,
+			message: "댓글이 성공적으로 수정되었습니다.",
+			result: updatedComment
+		});
 	} catch (error) {
 		console.error('댓글 수정 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
@@ -89,10 +98,19 @@ router.delete('/:commentId', authMiddleware, async (req, res) => {
 		const userId = req.user.id;
 		
 		const result = await contentsServices.deleteComment(commentId, userId);
-		res.json(result);
+		res.json({
+			code: 200,
+			message: "댓글이 성공적으로 삭제되었습니다.",
+			result: result
+		});
 	} catch (error) {
 		console.error('댓글 삭제 오류:', error);
-		res.status(error.statusCode || 500).json({ message: error.message });
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message,
+			result: null
+		});
 	}
 });
 
