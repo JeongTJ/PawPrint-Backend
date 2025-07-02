@@ -3,6 +3,8 @@ const router = express.Router();
 const contentsServices = require('../services/contentsServices');
 const { authMiddleware } = require('../middlewares/auth');
 const upload = require('../middlewares/upload');
+const { logSensitiveAction } = require('../middlewares/logging');
+const { logUserAction } = require('../config/logger');
 
 /**
  * @openapi
@@ -248,6 +250,16 @@ router.post('/', authMiddleware, upload.array('images', 5), async (req, res) => 
 			content = await contentsServices.create(contentData);
 		}
 
+		// 게시물 생성 로깅
+		logUserAction(userId, 'CREATE_CONTENT', {
+			contentId: content.id,
+			contentType: contentType,
+			hasMedia: imageFiles && imageFiles.length > 0,
+			mediaCount: imageFiles ? imageFiles.length : 0,
+			url: req.originalUrl,
+			method: req.method
+		});
+
 		res.status(201).json(content);
 	} catch (error) {
 		console.error('게시물 생성 오류:', error);
@@ -261,6 +273,15 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 		const contentData = req.body;
 		
 		const content = await contentsServices.update(id, contentData);
+		
+		// 게시물 수정 로깅
+		logUserAction(req.user.id, 'UPDATE_CONTENT', {
+			contentId: id,
+			updatedFields: Object.keys(contentData),
+			url: req.originalUrl,
+			method: req.method
+		});
+
 		res.json(content);
 	} catch (error) {
 		console.error('게시물 수정 오류:', error);
@@ -274,6 +295,10 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 		const userId = req.user.id;
 		
 		const deletedContent = await contentsServices.deleteById(id, userId);
+		
+		// 게시물 삭제 민감한 행동 로깅
+		logSensitiveAction(req, 'DELETE_CONTENT', id);
+
 		res.json(deletedContent);
 	} catch (error) {
 		console.error('게시물 삭제 오류:', error);
@@ -421,6 +446,14 @@ router.post('/:id/likes', authMiddleware, async (req, res) => {
 		const userId = req.user.id;
 		
 		const result = await contentsServices.toggleLike(userId, id);
+		
+		// 좋아요 행동 로깅
+		logUserAction(userId, result.isLiked ? 'LIKE_CONTENT' : 'UNLIKE_CONTENT', {
+			contentId: id,
+			url: req.originalUrl,
+			method: req.method
+		});
+
 		res.json(result);
 	} catch (error) {
 		console.error('좋아요 토글 오류:', error);
@@ -506,6 +539,15 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
 		const { body } = req.body;
 		
 		const comment = await contentsServices.createComment(userId, id, body);
+		
+		// 댓글 작성 로깅
+		logUserAction(userId, 'CREATE_COMMENT', {
+			commentId: comment.id,
+			contentId: id,
+			url: req.originalUrl,
+			method: req.method
+		});
+
 		res.status(201).json(comment);
 	} catch (error) {
 		console.error('댓글 작성 오류:', error);
