@@ -67,7 +67,7 @@ const { logUserAction } = require('../config/logger');
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/ContentResponse'
+ *                 $ref: '#/components/schemas/QnaContentResponse'
  * 
  * /api/contents/community:
  *   get:
@@ -81,7 +81,7 @@ const { logUserAction } = require('../config/logger');
  *             schema:
  *               type: array
  *               items:
- *                 $ref: '#/components/schemas/ContentResponse'
+ *                 $ref: '#/components/schemas/CommunityContentResponse'
  * 
  * /api/contents/{id}:
  *   get:
@@ -99,7 +99,7 @@ const { logUserAction } = require('../config/logger');
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ContentResponse'
+ *               $ref: '#/components/schemas/CommunityContentResponse'
  *   patch:
  *     summary: 특정 게시물 수정
  *     tags: [Contents]
@@ -121,7 +121,7 @@ const { logUserAction } = require('../config/logger');
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ContentResponse'
+ *               $ref: '#/components/schemas/CommunityContentResponse'
  *   delete:
  *     summary: 특정 게시물 삭제
  *     tags: [Contents]
@@ -137,7 +137,7 @@ const { logUserAction } = require('../config/logger');
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/ContentResponse'
+ *               $ref: '#/components/schemas/CommunityContentResponse'
  * 
  * /api/contents/{id}/refresh-sas:
  *   post:

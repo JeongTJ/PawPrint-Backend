@@ -10,7 +10,9 @@ const {
 	ContentCreateRequest, 
 	ContentUpdateRequest, 
 	ContentUpdateWithMediaRequest,
-	ErrorResponse
+	ErrorResponse,
+	QnaContentResponse,
+	CommunityContentResponse
 } = require('./contentSchemas');
 
 const options = {
@@ -63,6 +65,8 @@ const options = {
 				ContentUpdateRequest: ContentUpdateRequest,
 				ContentUpdateWithMediaRequest: ContentUpdateWithMediaRequest,
 				ErrorResponse: ErrorResponse,
+				QnaContentResponse: QnaContentResponse,
+				CommunityContentResponse: CommunityContentResponse,
 
 				UserResponse: UserResponse,
 				UserCreateRequest: UserCreateRequest,
