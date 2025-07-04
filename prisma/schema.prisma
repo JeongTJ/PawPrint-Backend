@@ -31,6 +31,8 @@ model User {
   pets          Pet[]
   contentLikes  ContentLike[]
   commentLikes  CommentLike[]
+  dailyMissions DailyMission[]
+  missionMemories MissionMemory[]
 
   @@map("users")
 }
@@ -220,4 +222,58 @@ model MemoryTagMap {
 
   @@unique([memoryId, tagId])
   @@map("memory_tag_maps")
+}
+
+// MissionTemplate 테이블 (일일 미션 템플릿)
+model MissionTemplate {
+  id          Int    @id @default(autoincrement())
+  category    String // 미션 카테고리 (예: 운동, 건강, 교육 등)
+  title       String // 미션 제목
+  description String // 미션 설명
+  order       Int    // 미션 순서
+  isActive    Boolean @default(true) @map("is_active") // 활성화 여부
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  dailyMissions DailyMission[]
+
+  @@map("mission_templates")
+}
+
+// DailyMission 테이블 (사용자별 일일 미션)
+model DailyMission {
+  id                Int       @id @default(autoincrement())
+  userId            Int       @map("user_id")
+  missionTemplateId Int       @map("mission_template_id")
+  date              DateTime  @db.Date // 미션 날짜
+  isCompleted       Boolean   @default(false) @map("is_completed")
+  completedAt       DateTime? @map("completed_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missionTemplate MissionTemplate  @relation(fields: [missionTemplateId], references: [id], onDelete: Cascade)
+  missionMemory   MissionMemory?
+
+  @@unique([userId, missionTemplateId, date]) // 같은 날 같은 미션은 하나만
+  @@map("daily_missions")
+}
+
+// MissionMemory 테이블 (완료된 미션의 추억)
+model MissionMemory {
+  id            Int    @id @default(autoincrement())
+  userId        Int    @map("user_id")
+  dailyMissionId Int   @unique @map("daily_mission_id")
+  content       String // 미션 완료 내용
+  imageUrl      String? @map("image_url") // 미션 완료 이미지 (선택사항)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dailyMission DailyMission @relation(fields: [dailyMissionId], references: [id], onDelete: Cascade)
+
+  @@map("mission_memories")
 } 

@@ -41,6 +41,9 @@ const {
 	PlanListResponse,
 	PlanSimpleResponse
 } = require('./planSchemas');
+const { 
+	schemas: missionSchemas
+} = require('./missionSchemas');
 
 const options = {
 	definition: {
@@ -96,6 +99,9 @@ const options = {
 				PlanResponse: PlanResponse,
 				PlanListResponse: PlanListResponse,
 				PlanSimpleResponse: PlanSimpleResponse,
+
+				// ==================== Daily Mission Schemas ====================
+				...missionSchemas,
 
 				// Content Schemas (단일)
 				MediaResponse: MediaResponse,
@@ -156,6 +162,18 @@ const options = {
 		{
 			name: 'Auth',
 			description: '로그인·토큰·회원 프로필 관련 API',
+		},
+		{
+			name: 'Mission Templates',
+			description: '일일 미션 템플릿 관리 API (관리자용)',
+		},
+		{
+			name: 'Daily Missions',
+			description: '사용자별 일일 미션 관리 API',
+		},
+		{
+			name: 'Mission Memories',
+			description: '완료된 미션의 추억 관리 API',
 		},
 	],
 };
