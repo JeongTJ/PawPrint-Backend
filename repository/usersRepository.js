@@ -28,6 +28,15 @@ const findByLoginId = async (loginId) => {
 	});
 };
 
+// 특정 사용자 nickname으로 찾기
+const findByNickname = async (nickname) => {
+	console.log("nickname", nickname);
+	return await prisma.user.findUnique({
+		where: { nickname },
+		select: publicUserSelect
+	});
+};
+
 // 특정 사용자 db id로 찾기
 const findById = async (id) => {
 	return await prisma.user.findUnique({
@@ -204,6 +213,7 @@ const createUserWithPet = async (userData, petData, files = {}) => {
 module.exports = {
 	findAll,
 	findByLoginId,
+	findByNickname,
 	findById,
 	findByIdIncludeRefreshToken,
 	findByLoginIdWithPassword,
