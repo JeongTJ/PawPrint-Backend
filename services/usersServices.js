@@ -53,6 +53,17 @@ const findByLoginId = async (loginId) => {
 	return user;
 };
 
+const findByNickname = async (nickname) => {
+	const user = await usersRepository.findByNickname(nickname);
+	
+	if (!user) {
+		const error = new Error(`User with nickname '${nickname}' not found.`);
+		error.statusCode = 404;
+		throw error;
+	}
+	return user;
+};
+
 // ========== 로그인 플로우 관련 함수들 ==========
 
 // 사용자 인증 (로그인)
@@ -122,6 +133,7 @@ module.exports = {
 	create, 
 	update, 
 	findByLoginId, 
+	findByNickname,
 	findById,
 	findByIdIncludeRefreshToken,
 	// 로그인 플로우 관련

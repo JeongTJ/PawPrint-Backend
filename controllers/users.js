@@ -1,23 +1,38 @@
 const express = require('express');
 const router  = express.Router();
 const usersServices = require('../services/usersServices');
+const contentsServices = require('../services/contentsServices');
 const { authMiddleware } = require('../middlewares/auth');
 
 /**
  * @openapi
  * /api/users:
  *   get:
- *     summary: 모든 사용자 조회
+ *     summary: 사용자 조회 (전체 목록 또는 닉네임 검색)
  *     tags: [users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: nickname
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: 검색할 닉네임 (없으면 전체 사용자 목록 반환)
  *     responses:
  *       200:
- *         description: 사용자 목록
+ *         description: 사용자 목록 또는 검색된 사용자
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/UserResponse'
+ *               oneOf:
+ *                 - type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/UserResponse'
+ *                 - $ref: '#/components/schemas/UserResponse'
+ *       404:
+ *         description: 사용자를 찾을 수 없음 (닉네임 검색 시)
+ *
  *   post:
  *     summary: 새 사용자 생성
  *     tags: [users]
@@ -63,6 +78,7 @@ const { authMiddleware } = require('../middlewares/auth');
  *             schema:
  *               $ref: '#/components/schemas/UserResponse'
  * 
+ *
  * /api/users/{userId}:
  *   get:
  *     summary: 특정 사용자 조회
@@ -80,16 +96,48 @@ const { authMiddleware } = require('../middlewares/auth');
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/UserResponse'
+ * /api/users/{userId}/contents:
+ *   get:
+ *     summary: 특정 사용자의 게시물 목록 조회
+ *     tags: [users]
+ *     parameters:
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: 특정 사용자의 게시물 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ContentWithMediaResponse'
  */
 
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, async (req, res) => {
 	try {
-		const users = await usersServices.findAll();
-		res.json({
-			code: 200,
-			message: "사용자 목록을 성공적으로 조회했습니다.",
-			result: users
-		});
+		const { nickname } = req.query;
+		
+		// nickname 쿼리 파라미터가 있으면 닉네임으로 검색
+		if (nickname) {
+			const user = await usersServices.findByNickname(nickname);
+			res.json({
+				code: 200,
+				message: "사용자 정보를 성공적으로 조회했습니다.",
+				result: user
+			});
+		} else {
+			// nickname 파라미터가 없으면 전체 사용자 목록 조회
+			const users = await usersServices.findAll();
+			res.json({
+				code: 200,
+				message: "사용자 목록을 성공적으로 조회했습니다.",
+				result: users
+			});
+		}
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
 		res.status(statusCode).json({
@@ -180,6 +228,26 @@ router.get('/:userId', authMiddleware, async (req, res) => {
 	}
 });
 
+// 특정 사용자 조회 (ID 기반) - 관리자용 또는 다른 사용자 프로필 조회용
+router.get('/:userId/contents', authMiddleware, async (req, res) => {
+	try {
+		const { userId } = req.params;
+		const contents = await contentsServices.findByUserId(userId);
+		res.json({
+			code: 200,
+			message: "사용자의 게시물 목록을 성공적으로 조회했습니다.",
+			result: contents
+		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
+});
+
 // ==================== 사용자별 좋아요/댓글 조회 API ====================
 
 /**
@@ -221,7 +289,6 @@ router.get('/:userId', authMiddleware, async (req, res) => {
 router.get('/me/likes', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id;
-		const contentsServices = require('../services/contentsServices');
 		
 		const likedContents = await contentsServices.getUserLikedContents(userId);
 		res.json({
@@ -244,7 +311,6 @@ router.get('/me/likes', authMiddleware, async (req, res) => {
 router.get('/me/comments', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id;
-		const contentsServices = require('../services/contentsServices');
 		
 		const userComments = await contentsServices.getUserComments(userId);
 		res.json({
