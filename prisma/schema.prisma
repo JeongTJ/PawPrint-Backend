@@ -119,14 +119,17 @@ model CommentLike {
 
 // Plan 테이블
 model Plan {
-  id        Int    @id @default(autoincrement())
-  userId    Int    @map("user_id")
-  title     String
-  date      DateTime  @db.Date
-  time      DateTime? @db.Time
-  isChecked Boolean   @default(false) @map("is_checked")
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at")
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
+  title       String
+  description String?
+  date        DateTime  @db.Date
+  time        DateTime? @db.Time
+  isCompleted Boolean   @default(false) @map("is_completed")
+  location    String?
+  reminderAt  DateTime? @map("reminder_at") // 알림 시간 (선택적)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
 
   // Relations
   user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)

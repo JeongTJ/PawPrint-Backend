@@ -30,6 +30,17 @@ const {
 	RegisterData,
 	PetInfo,
 } = require('./authSchemas');
+const {
+	PlanData,
+	MissionData,
+	PlanReminderData,
+	PlanWithUserData,
+	PlanCreateRequest,
+	PlanUpdateRequest,
+	PlanResponse,
+	PlanListResponse,
+	PlanSimpleResponse
+} = require('./planSchemas');
 
 const options = {
 	definition: {
@@ -76,25 +87,15 @@ const options = {
 				},
 				
 				// ==================== Plan Schemas ====================
-				Plan: {                // ← 여기!
-					type: 'object',
-					properties: {
-						// id:    { type: 'integer', example: 1 },
-						title: { type: 'string',  example: '산책' },
-						date:  { type: 'string',  format: 'date', example: '2024-06-30' },
-					},
-					required: ['title', 'date'],
-				},
-				PlanView: {                // ← 여기!
-					type: 'object',
-					properties: {
-						id:    { type: 'integer', example: 1 },
-						title: { type: 'string',  example: '산책' },
-						date:  { type: 'string',  format: 'date', example: '2024-06-30' },
-						created_at: { type: "created_at", format: "date-time", example: "2025-01-01T00:00:00.000Z" }
-					},
-					required: ['title', 'date'],
-				},
+				PlanData: PlanData,
+				MissionData: MissionData,
+				PlanReminderData: PlanReminderData,
+				PlanWithUserData: PlanWithUserData,
+				PlanCreateRequest: PlanCreateRequest,
+				PlanUpdateRequest: PlanUpdateRequest,
+				PlanResponse: PlanResponse,
+				PlanListResponse: PlanListResponse,
+				PlanSimpleResponse: PlanSimpleResponse,
 
 				// Content Schemas (단일)
 				MediaResponse: MediaResponse,
