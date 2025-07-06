@@ -3,7 +3,7 @@ const {
   dailyMissionRepository, 
   missionMemoryRepository 
 } = require('../repository/missionRepository');
-const { getKoreaTodayStart, getKoreaNow, formatKoreaDate } = require('../config/dateUtils');
+const { getKoreaTodayStart, getKoreaNow, formatKoreaDate, getUTCDateFromString } = require('../config/dateUtils');
 const moment = require('moment-timezone');
 
 // 미션 템플릿 관련 서비스
@@ -130,7 +130,7 @@ const dailyMissionService = {
   // 특정 날짜의 일일 미션 조회
   getMissionsByDate: async (userId, date) => {
     try {
-      const targetDate = moment.tz(date, 'Asia/Seoul').startOf('day').toDate();
+      const targetDate = getUTCDateFromString(date);
       const missions = await dailyMissionRepository.findByUserAndDate(userId, targetDate);
       
       return { success: true, data: missions };
@@ -142,8 +142,8 @@ const dailyMissionService = {
   // 미션 기록 조회 (기간별)
   getMissionHistory: async (userId, startDate, endDate) => {
     try {
-      const start = moment.tz(startDate, 'Asia/Seoul').startOf('day').toDate();
-      const end = moment.tz(endDate, 'Asia/Seoul').endOf('day').toDate();
+      const start = getUTCDateFromString(startDate);
+      const end = getUTCDateFromString(endDate);
       
       const missions = await dailyMissionRepository.findMissionHistory(userId, start, end);
       return { success: true, data: missions };

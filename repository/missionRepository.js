@@ -68,6 +68,7 @@ const dailyMissionRepository = {
   // 사용자의 오늘 일일 미션 조회
   findTodayMissions: async (userId) => {
     const today = getKoreaTodayStart();
+	console.log('today', today);
     return await dailyMissionRepository.findByUserAndDate(userId, today);
   },
 
