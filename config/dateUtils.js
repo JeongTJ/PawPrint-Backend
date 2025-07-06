@@ -3,10 +3,12 @@ const moment = require("moment-timezone");
 
 /**
  * 한국 시간 기준으로 오늘 날짜 (00:00:00)를 반환
- * @returns {Date} 한국 시간 기준 오늘 0시 0분 0초
+ * @returns {Date} UTC 기준으로 한국 시간 오늘 날짜의 0시 0분 0초
  */
 const getKoreaTodayStart = () => {
-	return moment().tz("Asia/Seoul").startOf('day').toDate();
+	// 한국 시간 기준 오늘 날짜를 문자열로 가져와서 UTC Date 객체로 생성
+	const koreaToday = moment().tz("Asia/Seoul").format('YYYY-MM-DD');
+	return new Date(koreaToday + 'T00:00:00.000Z');
 };
 
 /**
@@ -20,10 +22,11 @@ const getKoreaNow = () => {
 /**
  * 한국 시간 기준으로 특정 날짜의 시작 시간 (00:00:00)을 반환
  * @param {Date} date 기준 날짜
- * @returns {Date} 한국 시간 기준 해당 날짜의 0시 0분 0초
+ * @returns {Date} UTC 기준으로 해당 날짜의 0시 0분 0초
  */
 const getKoreaDayStart = (date) => {
-	return moment(date).tz("Asia/Seoul").startOf('day').toDate();
+	const koreaDate = moment(date).tz("Asia/Seoul").format('YYYY-MM-DD');
+	return new Date(koreaDate + 'T00:00:00.000Z');
 };
 
 /**
@@ -37,7 +40,7 @@ const getKoreaDayEnd = (date) => {
 
 /**
  * 한국 시간 기준으로 날짜 포맷팅
- * @param {Date} date 포맷팅할 날짜 (null이면 현재 시간)
+ * @param {Date} date 포맷팅할 날짜 (null이면 현재 시간)`
  * @param {string} format 포맷 ('YYYY-MM-DD', 'YYYY-MM-DD HH:mm:ss' 등)
  * @returns {string} 포맷팅된 날짜 문자열
  */
@@ -78,6 +81,15 @@ const isToday = (date) => {
 	return isSameDayInKorea(date, new Date());
 };
 
+/**
+ * 날짜 문자열을 UTC 기준 Date 객체로 변환 (날짜 유지)
+ * @param {string} dateString YYYY-MM-DD 형식의 날짜 문자열
+ * @returns {Date} UTC 기준 해당 날짜의 0시 0분 0초
+ */
+const getUTCDateFromString = (dateString) => {
+	return new Date(dateString + 'T00:00:00.000Z');
+};
+
 module.exports = {
 	getKoreaTodayStart,
 	getKoreaNow,
@@ -86,5 +98,6 @@ module.exports = {
 	formatKoreaDate,
 	getKoreaTimeString,
 	isSameDayInKorea,
-	isToday
+	isToday,
+	getUTCDateFromString
 }; 
