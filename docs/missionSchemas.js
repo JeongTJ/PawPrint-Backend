@@ -118,12 +118,6 @@ const MissionMemorySchema = {
       description: '미션 완료 내용',
       example: '푸들이와 함께 한강에서 산책했어요!'
     },
-    imageUrl: {
-      type: 'string',
-      description: '미션 완료 이미지 URL',
-      nullable: true,
-      example: 'https://example.com/image.jpg'
-    },
     createdAt: {
       type: 'string',
       format: 'date-time',
@@ -136,6 +130,43 @@ const MissionMemorySchema = {
     },
     dailyMission: {
       $ref: '#/components/schemas/DailyMission'
+    },
+    images: {
+      type: 'array',
+      description: '미션 완료 이미지들',
+      items: {
+        $ref: '#/components/schemas/MissionImage'
+      }
+    }
+  }
+};
+
+// 미션 이미지 스키마
+const MissionImageSchema = {
+  type: 'object',
+  properties: {
+    id: {
+      type: 'integer',
+      description: '미션 이미지 ID'
+    },
+    missionMemoryId: {
+      type: 'integer',
+      description: '미션 추억 ID'
+    },
+    imageUrl: {
+      type: 'string',
+      description: '이미지 URL',
+      example: 'https://example.com/image.jpg'
+    },
+    createdAt: {
+      type: 'string',
+      format: 'date-time',
+      description: '생성일시'
+    },
+    updatedAt: {
+      type: 'string',
+      format: 'date-time',
+      description: '수정일시'
     }
   }
 };
@@ -181,11 +212,6 @@ const CreateMissionMemoryRequest = {
       type: 'string',
       description: '미션 완료 내용',
       example: '푸들이와 함께 한강에서 산책했어요!'
-    },
-    imageUrl: {
-      type: 'string',
-      description: '미션 완료 이미지 URL',
-      example: 'https://example.com/image.jpg'
     }
   }
 };
@@ -197,11 +223,33 @@ const UpdateMissionMemoryRequest = {
       type: 'string',
       description: '미션 완료 내용',
       example: '푸들이와 함께 한강에서 산책했어요!'
+    }
+  }
+};
+
+
+
+const UploadMissionMemoryRequest = {
+  type: 'object',
+  required: ['dailyMissionId', 'content'],
+  properties: {
+    dailyMissionId: {
+      type: 'integer',
+      description: '일일 미션 ID',
+      example: 1
     },
-    imageUrl: {
+    content: {
       type: 'string',
-      description: '미션 완료 이미지 URL',
-      example: 'https://example.com/image.jpg'
+      description: '미션 완료 내용',
+      example: '푸들이와 함께 한강에서 산책했어요!'
+    },
+    images: {
+      type: 'array',
+      description: '업로드할 이미지 파일들',
+      items: {
+        type: 'string',
+        format: 'binary'
+      }
     }
   }
 };
@@ -470,8 +518,66 @@ const missionPaths = {
     },
     post: {
       tags: ['Mission Memories'],
-      summary: '미션 추억 생성',
-      description: '완료된 미션의 추억을 생성합니다.',
+      summary: '미션 추억 생성 (파일 업로드)',
+      description: '파일 업로드를 통해 미션 추억을 생성합니다.',
+      security: [{ bearerAuth: [] }],
+      requestBody: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: {
+                dailyMissionId: {
+                  type: 'integer',
+                  description: '일일 미션 ID',
+                  example: 1
+                },
+                content: {
+                  type: 'string',
+                  description: '미션 완료 내용',
+                  example: '푸들이와 함께 한강에서 산책했어요!'
+                },
+                images: {
+                  type: 'array',
+                  description: '업로드할 이미지 파일들 (최대 10개)',
+                  items: {
+                    type: 'string',
+                    format: 'binary'
+                  },
+                  maxItems: 10
+                }
+              },
+              required: ['dailyMissionId', 'content']
+            }
+          }
+        }
+      },
+      responses: {
+        201: {
+          description: '미션 추억 생성 성공',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: true },
+                  data: { $ref: '#/components/schemas/MissionMemory' },
+                  message: { type: 'string', example: '미션 추억이 생성되었습니다.' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  
+  '/api/mission-memories/with-urls': {
+    post: {
+      tags: ['Mission Memories'],
+      summary: '미션 추억 생성 (URL 방식)',
+      description: '이미지 URL을 통해 미션 추억을 생성합니다.',
       security: [{ bearerAuth: [] }],
       requestBody: {
         required: true,
@@ -573,6 +679,191 @@ const missionPaths = {
         }
       }
     }
+  },
+
+  // 미션 이미지 관련 API
+  '/api/missions/memories/{id}/images': {
+    get: {
+      tags: ['Mission Images'],
+      summary: '미션 추억의 모든 이미지 조회',
+      description: '특정 미션 추억의 모든 이미지를 조회합니다.',
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: '미션 추억 ID',
+          schema: { type: 'integer', example: 1 }
+        }
+      ],
+      responses: {
+        200: {
+          description: '미션 이미지 조회 성공',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: true },
+                  data: {
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/MissionImage' }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+  },
+
+  '/api/missions/memories/{id}/images/upload': {
+    post: {
+      tags: ['Mission Images'],
+      summary: '미션 추억에 이미지 업로드 (단일 파일)',
+      description: '미션 추억에 새로운 이미지 파일을 업로드합니다.',
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: '미션 추억 ID',
+          schema: { type: 'integer', example: 1 }
+        }
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: {
+                image: {
+                  type: 'string',
+                  format: 'binary',
+                  description: '업로드할 이미지 파일'
+                }
+              },
+              required: ['image']
+            }
+          }
+        }
+      },
+      responses: {
+        201: {
+          description: '미션 이미지 업로드 성공',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: true },
+                  data: { $ref: '#/components/schemas/MissionImage' },
+                  message: { type: 'string', example: '미션 이미지가 업로드되었습니다.' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  '/api/missions/memories/{id}/images/upload-multiple': {
+    post: {
+      tags: ['Mission Images'],
+      summary: '미션 추억에 여러 이미지 업로드',
+      description: '미션 추억에 여러 이미지 파일을 업로드합니다.',
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: '미션 추억 ID',
+          schema: { type: 'integer', example: 1 }
+        }
+      ],
+      requestBody: {
+        required: true,
+        content: {
+          'multipart/form-data': {
+            schema: {
+              type: 'object',
+              properties: {
+                images: {
+                  type: 'array',
+                  description: '업로드할 이미지 파일들 (최대 10개)',
+                  items: {
+                    type: 'string',
+                    format: 'binary'
+                  }
+                }
+              },
+              required: ['images']
+            }
+          }
+        }
+      },
+      responses: {
+        201: {
+          description: '미션 이미지들 업로드 성공',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: true },
+                  data: {
+                    type: 'array',
+                    items: { $ref: '#/components/schemas/MissionImage' }
+                  },
+                  message: { type: 'string', example: '미션 이미지들이 업로드되었습니다.' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+
+  '/api/missions/images/{id}': {
+    delete: {
+      tags: ['Mission Images'],
+      summary: '미션 이미지 삭제',
+      description: '특정 미션 이미지를 삭제합니다.',
+      security: [{ bearerAuth: [] }],
+      parameters: [
+        {
+          name: 'id',
+          in: 'path',
+          required: true,
+          description: '미션 이미지 ID',
+          schema: { type: 'integer', example: 1 }
+        }
+      ],
+      responses: {
+        200: {
+          description: '미션 이미지 삭제 성공',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  success: { type: 'boolean', example: true },
+                  message: { type: 'string', example: '미션 이미지가 삭제되었습니다.' }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 };
 
@@ -581,9 +872,11 @@ module.exports = {
     MissionTemplate: MissionTemplateSchema,
     DailyMission: DailyMissionSchema,
     MissionMemory: MissionMemorySchema,
+    MissionImage: MissionImageSchema,
     CreateMissionTemplateRequest,
     CreateMissionMemoryRequest,
-    UpdateMissionMemoryRequest
+    UpdateMissionMemoryRequest,
+    UploadMissionMemoryRequest
   },
   paths: missionPaths
 }; 

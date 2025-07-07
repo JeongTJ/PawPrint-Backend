@@ -1,9 +1,11 @@
 const { 
   missionTemplateRepository, 
   dailyMissionRepository, 
-  missionMemoryRepository 
+  missionMemoryRepository,
+  missionImageRepository 
 } = require('../repository/missionRepository');
 const { getKoreaTodayStart, getKoreaNow, formatKoreaDate, getUTCDateFromString } = require('../config/dateUtils');
+const { uploadFile, uploadMultipleFiles, deleteFile } = require('../repository/storageRepository');
 const moment = require('moment-timezone');
 
 // 미션 템플릿 관련 서비스
@@ -188,10 +190,12 @@ const missionMemoryService = {
     }
   },
 
+
+
   // 미션 추억 생성
-  createMissionMemory: async (userId, memoryData) => {
+  createMissionMemory: async (userId, memoryData, files) => {
     try {
-      const { dailyMissionId, content, imageUrl } = memoryData;
+      const { dailyMissionId, content } = memoryData;
 
       // 입력값 검증
       if (!dailyMissionId || !content) {
@@ -219,14 +223,27 @@ const missionMemoryService = {
         return { success: false, error: '이미 해당 미션의 추억이 존재합니다.' };
       }
 
+      // 미션 추억 생성
       const memory = await missionMemoryRepository.create({
         userId,
         dailyMissionId,
-        content,
-        imageUrl
+        content
       });
 
-      return { success: true, data: memory };
+      // 파일들이 있으면 업로드 후 저장
+      if (files && files.length > 0) {
+        const imageUrls = await uploadMultipleFiles(files, 'mission-images');
+        const imageData = imageUrls.map(url => ({
+          missionMemoryId: memory.id,
+          imageUrl: url
+        }));
+        await missionImageRepository.createMany(imageData);
+      }
+
+      // 최종 데이터 조회 (이미지 포함)
+      const finalMemory = await missionMemoryRepository.findById(memory.id);
+      
+      return { success: true, data: finalMemory };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -244,8 +261,15 @@ const missionMemoryService = {
         return { success: false, error: '해당 추억에 대한 권한이 없습니다.' };
       }
 
-      const updatedMemory = await missionMemoryRepository.update(memoryId, memoryData);
-      return { success: true, data: updatedMemory };
+      const { content } = memoryData;
+
+      // 미션 추억 내용 업데이트
+      const updatedMemory = await missionMemoryRepository.update(memoryId, { content });
+
+      // 최종 데이터 조회 (이미지 포함)
+      const finalMemory = await missionMemoryRepository.findById(memoryId);
+      
+      return { success: true, data: finalMemory };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -263,8 +287,137 @@ const missionMemoryService = {
         return { success: false, error: '해당 추억에 대한 권한이 없습니다.' };
       }
 
+      // 관련 이미지들도 먼저 삭제 (CASCADE로 자동 삭제되지만 명시적으로 처리)
+      await missionImageRepository.deleteByMissionMemoryId(memoryId);
+      
+      // 미션 추억 삭제
       await missionMemoryRepository.delete(memoryId);
+      
       return { success: true, message: '미션 추억이 삭제되었습니다.' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+};
+
+// 미션 이미지 관련 서비스
+const missionImageService = {
+  // 특정 미션 추억의 모든 이미지 조회
+  getMissionImages: async (missionMemoryId, userId) => {
+    try {
+      // 미션 추억 권한 확인
+      const missionMemory = await missionMemoryRepository.findById(missionMemoryId);
+      if (!missionMemory) {
+        return { success: false, error: '해당 미션 추억을 찾을 수 없습니다.' };
+      }
+
+      if (missionMemory.userId !== userId) {
+        return { success: false, error: '해당 추억에 대한 권한이 없습니다.' };
+      }
+
+      const images = await missionImageRepository.findByMissionMemoryId(missionMemoryId);
+      return { success: true, data: images };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+
+
+  // 미션 이미지 추가 (파일 업로드 방식)
+  uploadMissionImage: async (missionMemoryId, userId, file) => {
+    try {
+      // 미션 추억 권한 확인
+      const missionMemory = await missionMemoryRepository.findById(missionMemoryId);
+      if (!missionMemory) {
+        return { success: false, error: '해당 미션 추억을 찾을 수 없습니다.' };
+      }
+
+      if (missionMemory.userId !== userId) {
+        return { success: false, error: '해당 추억에 대한 권한이 없습니다.' };
+      }
+
+      if (!file) {
+        return { success: false, error: '이미지 파일이 필요합니다.' };
+      }
+
+      // 파일 업로드
+      const imageUrl = await uploadFile(
+        file.buffer, 
+        file.originalname, 
+        file.mimetype, 
+        'mission-images'
+      );
+
+      // 데이터베이스에 저장
+      const image = await missionImageRepository.create({
+        missionMemoryId,
+        imageUrl
+      });
+
+      return { success: true, data: image };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // 미션 이미지 여러 개 업로드
+  uploadMultipleMissionImages: async (missionMemoryId, userId, files) => {
+    try {
+      // 미션 추억 권한 확인
+      const missionMemory = await missionMemoryRepository.findById(missionMemoryId);
+      if (!missionMemory) {
+        return { success: false, error: '해당 미션 추억을 찾을 수 없습니다.' };
+      }
+
+      if (missionMemory.userId !== userId) {
+        return { success: false, error: '해당 추억에 대한 권한이 없습니다.' };
+      }
+
+      if (!files || files.length === 0) {
+        return { success: false, error: '이미지 파일이 필요합니다.' };
+      }
+
+      // 여러 파일 업로드
+      const imageUrls = await uploadMultipleFiles(files, 'mission-images');
+
+      // 데이터베이스에 저장
+      const imageData = imageUrls.map(url => ({
+        missionMemoryId,
+        imageUrl: url
+      }));
+
+      await missionImageRepository.createMany(imageData);
+
+      // 저장된 이미지들 조회
+      const images = await missionImageRepository.findByMissionMemoryId(missionMemoryId);
+      
+      return { success: true, data: images };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  },
+
+  // 미션 이미지 삭제
+  deleteMissionImage: async (imageId, userId) => {
+    try {
+      const image = await missionImageRepository.findById(imageId);
+      if (!image) {
+        return { success: false, error: '해당 이미지를 찾을 수 없습니다.' };
+      }
+
+      // 미션 추억 권한 확인
+      if (image.missionMemory.userId !== userId) {
+        return { success: false, error: '해당 이미지에 대한 권한이 없습니다.' };
+      }
+
+      // Azure Storage에서 파일 삭제
+      await deleteFile(image.imageUrl, 'mission-images');
+
+      // 데이터베이스에서 삭제
+      await missionImageRepository.delete(imageId);
+      
+      return { success: true, message: '이미지가 삭제되었습니다.' };
     } catch (error) {
       return { success: false, error: error.message };
     }
@@ -274,5 +427,6 @@ const missionMemoryService = {
 module.exports = {
   missionTemplateService,
   dailyMissionService,
-  missionMemoryService
+  missionMemoryService,
+  missionImageService
 }; 
