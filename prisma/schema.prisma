@@ -267,13 +267,27 @@ model MissionMemory {
   userId        Int    @map("user_id")
   dailyMissionId Int   @unique @map("daily_mission_id")
   content       String // 미션 완료 내용
-  imageUrl      String? @map("image_url") // 미션 완료 이미지 (선택사항)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   dailyMission DailyMission @relation(fields: [dailyMissionId], references: [id], onDelete: Cascade)
+  images       MissionImage[]
 
   @@map("mission_memories")
+}
+
+// MissionImage 테이블 (미션 추억 이미지)
+model MissionImage {
+  id              Int    @id @default(autoincrement())
+  missionMemoryId Int    @map("mission_memory_id")
+  imageUrl        String @map("image_url")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  // Relations
+  missionMemory MissionMemory @relation(fields: [missionMemoryId], references: [id], onDelete: Cascade)
+
+  @@map("mission_images")
 } 

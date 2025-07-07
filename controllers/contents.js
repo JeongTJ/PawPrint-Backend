@@ -189,7 +189,6 @@ const { logUserAction } = require('../config/logger');
 router.get('/', authMiddleware, async (req, res) => {
 	try {
 		const contents = await contentsServices.findAll();
-		console.log("contents ", contents);
 		res.json({
 			code: 200,
 			message: "성공했습니다.",
