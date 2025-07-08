@@ -219,6 +219,39 @@ const isSasUrlExpired = (sasUrl) => {
 	}
 };
 
+/**
+ * 범용 SAS URL 리프레시 함수 - 개별 URL 처리
+ * @param {string} url - 확인할 URL
+ * @param {string} containerName - 컨테이너 이름
+ * @param {Function} updateCallback - URL 업데이트 콜백 함수 (oldUrl, newUrl) => Promise
+ * @returns {Promise<string>} - 새로운 URL 또는 기존 URL
+ */
+const refreshUrlIfExpired = async (url, containerName, updateCallback) => {
+	if (!url || !isSasUrlExpired(url)) {
+		return url; // 만료되지 않았으면 기존 URL 반환
+	}
+	
+	// 새 URL 생성
+	const newUrl = await regenerateSasUrl(url, containerName);
+	if (!newUrl) {
+		console.warn(`SAS URL 재생성 실패: ${url}`);
+		return url; // 실패 시 기존 URL 반환
+	}
+	
+	// DB 업데이트 (콜백 함수 사용)
+	if (updateCallback) {
+		try {
+			await updateCallback(url, newUrl);
+			console.log(`SAS URL 재생성 완료: ${containerName}`);
+		} catch (error) {
+			console.error(`SAS URL DB 업데이트 실패: ${error.message}`);
+			return url; // 실패 시 기존 URL 반환
+		}
+	}
+	
+	return newUrl;
+};
+
 module.exports = {
 	uploadFile,
 	uploadMultipleFiles,
@@ -228,4 +261,6 @@ module.exports = {
 	regenerateSasUrl,
 	regenerateMultipleSasUrls,
 	isSasUrlExpired,
+	// 범용 SAS URL 리프레시
+	refreshUrlIfExpired
 }; 

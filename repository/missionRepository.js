@@ -165,26 +165,15 @@ const missionMemoryRepository = {
             orderBy: { createdAt: 'desc' }
         });
 
-        // SAS URL 재생성 로직 추가
-        if (memories.length > 0) {
-            await refreshExpiredMissionImageSasUrls(memories.map(m => m.id));
-            
-            // 최신 데이터 재조회
-            return await prisma.missionMemory.findMany({
-                where: { userId },
-                include: {
-                    dailyMission: {
-                        include: {
-                            missionTemplate: true
-                        }
-                    },
-                    images: true
-                },
-                orderBy: { createdAt: 'desc' }
-            });
-        }
+        // 각 미션 추억의 이미지 SAS URL 리프레시
+        const refreshedMemories = await Promise.all(
+            memories.map(async (memory) => ({
+                ...memory,
+                images: await refreshMissionImageUrlsIfExpired(memory.images)
+            }))
+        );
 
-        return memories;
+        return refreshedMemories;
     },
 
     // 특정 미션 추억 조회
@@ -201,25 +190,17 @@ const missionMemoryRepository = {
             }
         });
 
-        // SAS URL 재생성 로직 추가
-        if (memory) {
-            await refreshExpiredMissionImageSasUrls([memory.id]);
-            
-            // 최신 데이터 재조회
-            return await prisma.missionMemory.findUnique({
-                where: { id },
-                include: {
-                    dailyMission: {
-                        include: {
-                            missionTemplate: true
-                        }
-                    },
-                    images: true
-                }
-            });
+        if (!memory) {
+            return null;
         }
 
-        return memory;
+        // 이미지 SAS URL 리프레시
+        const refreshedImages = await refreshMissionImageUrlsIfExpired(memory.images);
+
+        return {
+            ...memory,
+            images: refreshedImages
+        };
     },
 
     // 특정 일일 미션의 추억 조회
@@ -236,25 +217,17 @@ const missionMemoryRepository = {
             }
         });
 
-        // SAS URL 재생성 로직 추가
-        if (memory) {
-            await refreshExpiredMissionImageSasUrls([memory.id]);
-            
-            // 최신 데이터 재조회
-            return await prisma.missionMemory.findUnique({
-                where: { dailyMissionId },
-                include: {
-                    dailyMission: {
-                        include: {
-                            missionTemplate: true
-                        }
-                    },
-                    images: true
-                }
-            });
+        if (!memory) {
+            return null;
         }
 
-        return memory;
+        // 이미지 SAS URL 리프레시
+        const refreshedImages = await refreshMissionImageUrlsIfExpired(memory.images);
+
+        return {
+            ...memory,
+            images: refreshedImages
+        };
     },
 
     // 미션 추억 생성
@@ -305,7 +278,8 @@ const missionMemoryRepository = {
             return { message: '미션 이미지가 없습니다' };
         }
 
-        await refreshExpiredMissionImageSasUrls([parseInt(missionMemoryId)]);
+        // 각 이미지 URL 리프레시
+        await refreshMissionImageUrlsIfExpired(images);
 
         return { 
             success: true, 
@@ -371,80 +345,33 @@ const missionImageRepository = {
     }
 };
 
-// 미션 이미지들의 만료된 SAS URL을 재생성하는 헬퍼 함수
-const refreshExpiredMissionImageSasUrls = async (missionMemoryIds) => {
-    if (!Array.isArray(missionMemoryIds) || missionMemoryIds.length === 0) {
-        return [];
-    }
+// 미션 이미지 SAS URL 리프레시 (간소화된 버전 - storageRepository 범용 함수 사용)
+const refreshMissionImageUrlsIfExpired = async (imagesArray) => {
+    if (!imagesArray || imagesArray.length === 0) return imagesArray;
 
-    // 현재 미션 이미지 정보 조회
-    const currentImages = await prisma.missionImage.findMany({
-        where: {
-            missionMemoryId: {
-                in: missionMemoryIds
-            }
-        },
-        orderBy: [
-            { missionMemoryId: 'asc' },
-            { id: 'asc' }
-        ]
-    });
-
-    const expiredImages = currentImages.filter(image => 
-        storageRepository.isSasUrlExpired(image.imageUrl)
-    );
-
-    if (expiredImages.length === 0) {
-        return currentImages; // 만료된 URL이 없으면 그대로 반환
-    }
-
-    console.log(`${expiredImages.length}개의 만료된 미션 이미지 SAS URL 발견, 재생성 중...`);
-
-    // 만료된 URL들을 재생성
-    const regenerateResult = await storageRepository.regenerateMultipleSasUrls(
-        expiredImages.map(image => image.imageUrl),
-        'mission-images'
-    );
-
-    // 성공적으로 재생성된 URL들을 DB에 업데이트
-    try {
-        await prisma.$transaction(async (tx) => {
-            for (const {old: oldUrl, new: newUrl} of regenerateResult.success) {
-                await tx.missionImage.updateMany({
-                    where: { imageUrl: oldUrl },
-                    data: { 
-                        imageUrl: newUrl,
-                        updatedAt: new Date()
-                    }
-                });
-            }
-        });
-
-        console.log(`${regenerateResult.success.length}개의 미션 이미지 SAS URL 재생성 및 DB 업데이트 완료`);
-
-        if (regenerateResult.failed.length > 0) {
-            console.warn(`${regenerateResult.failed.length}개의 미션 이미지 SAS URL 재생성 실패:`, regenerateResult.failed);
-        }
-
-        // DB 업데이트 후 최신 데이터 재조회
-        const updatedImages = await prisma.missionImage.findMany({
-            where: {
-                missionMemoryId: {
-                    in: missionMemoryIds
+    // 각 미션 이미지의 URL을 개별적으로 처리
+    const refreshedImages = await Promise.all(
+        imagesArray.map(async (image) => {
+            const newUrl = await storageRepository.refreshUrlIfExpired(
+                image.imageUrl,
+                'mission-images',
+                async (oldUrl, newUrl) => {
+                    // DB 업데이트 콜백
+                    await prisma.missionImage.update({
+                        where: { id: image.id },
+                        data: { 
+                            imageUrl: newUrl,
+                            updatedAt: new Date()
+                        }
+                    });
                 }
-            },
-            orderBy: [
-                { missionMemoryId: 'asc' },
-                { id: 'asc' }
-            ]
-        });
+            );
 
-        return updatedImages;
+            return { ...image, imageUrl: newUrl };
+        })
+    );
 
-    } catch (error) {
-        console.error('미션 이미지 SAS URL DB 업데이트 실패:', error);
-        return currentImages; // 실패 시 원본 데이터 반환
-    }
+    return refreshedImages;
 };
 
 module.exports = {

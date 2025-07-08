@@ -2,79 +2,33 @@ const { prisma } = require('../config/dbConfig');
 const storageRepository = require('./storageRepository');
 const bcrypt = require('bcrypt');
 
-// 미디어 배열의 만료된 SAS URL을 재생성하는 헬퍼 함수
-const refreshExpiredSasUrls = async (contentIds) => {
-	if (!Array.isArray(contentIds) || contentIds.length === 0) {
-		return [];
-	}
+// 미디어 SAS URL 리프레시 (간소화된 버전 - storageRepository 범용 함수 사용)
+const refreshMediaUrlsIfExpired = async (mediaArray) => {
+	if (!mediaArray || mediaArray.length === 0) return mediaArray;
 	
-	// 현재 미디어 정보 조회
-	const currentMedia = await prisma.media.findMany({
-		where: {
-			contentId: {
-				in: contentIds
-			}
-		},
-		orderBy: [
-			{ contentId: 'asc' },
-			{ id: 'asc' }
-		]
-	});
-	
-	const expiredMedia = currentMedia.filter(media => 
-		storageRepository.isSasUrlExpired(media.fileUrl)
-	);
-	
-	if (expiredMedia.length === 0) {
-		return currentMedia; // 만료된 URL이 없으면 그대로 반환
-	}
-	
-	console.log(`${expiredMedia.length}개의 만료된 SAS URL 발견, 재생성 중...`);
-	
-	// 만료된 URL들을 재생성
-	const regenerateResult = await storageRepository.regenerateMultipleSasUrls(
-		expiredMedia.map(media => media.fileUrl)
-	);
-	
-	// 성공적으로 재생성된 URL들을 DB에 업데이트
-	try {
-		await prisma.$transaction(async (tx) => {
-			for (const {old: oldUrl, new: newUrl} of regenerateResult.success) {
-				await tx.media.updateMany({
-					where: { fileUrl: oldUrl },
-					data: { 
-						fileUrl: newUrl,
-						updatedAt: new Date()
-					}
-				});
-			}
-		});
-		
-		console.log(`${regenerateResult.success.length}개의 SAS URL 재생성 및 DB 업데이트 완료`);
-		
-		if (regenerateResult.failed.length > 0) {
-			console.warn(`${regenerateResult.failed.length}개의 SAS URL 재생성 실패:`, regenerateResult.failed);
-		}
-		
-		// DB 업데이트 후 최신 데이터 재조회
-		const updatedMedia = await prisma.media.findMany({
-			where: {
-				contentId: {
-					in: contentIds
+	// 각 미디어의 URL을 개별적으로 처리
+	const refreshedMedia = await Promise.all(
+		mediaArray.map(async (media) => {
+			const newUrl = await storageRepository.refreshUrlIfExpired(
+				media.fileUrl,
+				'contents-images',
+				async (oldUrl, newUrl) => {
+					// DB 업데이트 콜백
+					await prisma.media.update({
+						where: { id: media.id },
+						data: { 
+							fileUrl: newUrl,
+							updatedAt: new Date()
+						}
+					});
 				}
-			},
-			orderBy: [
-				{ contentId: 'asc' },
-				{ id: 'asc' }
-			]
-		});
-		
-		return updatedMedia;
-		
-	} catch (error) {
-		console.error('SAS URL DB 업데이트 실패:', error);
-		return currentMedia; // 실패 시 원본 데이터 반환
-	}
+			);
+			
+			return { ...media, fileUrl: newUrl };
+		})
+	);
+	
+	return refreshedMedia;
 };
 
 // 모든 게시물을 미디어와 함께 찾기
@@ -88,23 +42,15 @@ const findAll = async () => {
 		orderBy: { id: 'asc' }
 	});
 	
-	if (contents.length === 0) {
-		return contents;
-	}
+	// 각 컨텐츠의 미디어 SAS URL 리프레시
+	const refreshedContents = await Promise.all(
+		contents.map(async (content) => ({
+			...content,
+			media: await refreshMediaUrlsIfExpired(content.media)
+		}))
+	);
 	
-	// 만료된 SAS URL 갱신 후 최신 데이터 재조회
-	const contentIds = contents.map(content => content.id);
-	await refreshExpiredSasUrls(contentIds);
-	
-	// 최신 데이터 재조회
-	return await prisma.content.findMany({
-		include: {
-			media: {
-				orderBy: { id: 'asc' }
-			}
-		},
-		orderBy: { id: 'asc' }
-	});
+	return refreshedContents;
 };
 
 // 특정 게시물 타입으로 미디어와 함께 찾기 (qna, community)
@@ -119,24 +65,15 @@ const findByContentType = async (contentType) => {
 		orderBy: { id: 'asc' }
 	});
 	
-	if (contents.length === 0) {
-		return contents;
-	}
+	// 각 컨텐츠의 미디어 SAS URL 리프레시
+	const refreshedContents = await Promise.all(
+		contents.map(async (content) => ({
+			...content,
+			media: await refreshMediaUrlsIfExpired(content.media)
+		}))
+	);
 	
-	// 만료된 SAS URL 갱신 후 최신 데이터 재조회
-	const contentIds = contents.map(content => content.id);
-	await refreshExpiredSasUrls(contentIds);
-	
-	// 최신 데이터 재조회
-	return await prisma.content.findMany({
-		where: { contentType },
-		include: {
-			media: {
-				orderBy: { id: 'asc' }
-			}
-		},
-		orderBy: { id: 'asc' }
-	});
+	return refreshedContents;
 };
 
 // 특정 사용자의 게시물을 미디어와 함께 찾기
@@ -151,24 +88,15 @@ const findByUserId = async (userId) => {
 		orderBy: { id: 'asc' }
 	});
 	
-	if (contents.length === 0) {
-		return contents;
-	}
+	// 각 컨텐츠의 미디어 SAS URL 리프레시
+	const refreshedContents = await Promise.all(
+		contents.map(async (content) => ({
+			...content,
+			media: await refreshMediaUrlsIfExpired(content.media)
+		}))
+	);
 	
-	// 만료된 SAS URL 갱신 후 최신 데이터 재조회
-	const contentIds = contents.map(content => content.id);
-	await refreshExpiredSasUrls(contentIds);
-	
-	// 최신 데이터 재조회
-	return await prisma.content.findMany({
-		where: { userId: parseInt(userId) },
-		include: {
-			media: {
-				orderBy: { id: 'asc' }
-			}
-		},
-		orderBy: { id: 'asc' }
-	});
+	return refreshedContents;
 };
 
 // 특정 게시물을 미디어와 함께 생성 (트랜잭션 사용)
@@ -265,18 +193,13 @@ const findById = async (id) => {
 		return null;
 	}
 	
-	// 만료된 SAS URL 갱신
-	await refreshExpiredSasUrls([content.id]);
+	// 미디어 SAS URL 리프레시
+	const refreshedMedia = await refreshMediaUrlsIfExpired(content.media);
 	
-	// 최신 데이터 재조회
-	return await prisma.content.findUnique({
-		where: { id: parseInt(id) },
-		include: {
-			media: {
-				orderBy: { id: 'asc' }
-			}
-		}
-	});
+	return {
+		...content,
+		media: refreshedMedia
+	};
 };
 
 // 게시물과 미디어를 함께 업데이트 (트랜잭션 사용)
@@ -502,7 +425,8 @@ const regenerateSasUrlsForContent = async (contentId) => {
 		return { message: '미디어가 없습니다' };
 	}
 	
-	await refreshExpiredSasUrls([parseInt(contentId)]);
+	// 각 미디어 URL 리프레시
+	await refreshMediaUrlsIfExpired(media);
 	
 	return { 
 		success: true, 
