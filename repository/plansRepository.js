@@ -8,7 +8,6 @@ const findAll = async () => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					nickname: true
 				}
 			},
@@ -44,7 +43,6 @@ const findById = async (id) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					nickname: true
 				}
 			},

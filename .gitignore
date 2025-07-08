@@ -3,3 +3,4 @@ db/data/
 .env
 node_modules/
 logs/
+test-front/

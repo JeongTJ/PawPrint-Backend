@@ -4,13 +4,12 @@ const storageRepository = require('./storageRepository');
 // 민감한 정보를 제외한 select 필드 정의
 const publicUserSelect = {
 	id: true,
-	loginId: true,
 	nickname: true,
 	profile: true,
 	statusNote: true,
 	createdAt: true,
 	updatedAt: true,
-	// password와 refreshToken은 제외
+	// password, refreshToken, loginId는 제외
 };
 
 // 모든 사용자 찾기
