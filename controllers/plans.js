@@ -121,6 +121,63 @@ const { authMiddleware } = require('../middlewares/auth');
  *             schema:
  *               $ref: '#/components/schemas/PlanListResponse'
  *
+ * /api/plans/week:
+ *   get:
+ *     summary: 주간 계획 조회
+ *     tags: [Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 주간 시작 날짜 (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: 주간 계획 목록 (7일간)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PlanListResponse'
+ *
+ * /api/plans/range:
+ *   get:
+ *     summary: 한 달 기간 내 날짜 범위별 계획 조회
+ *     tags: [Plans]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 시작 날짜 (YYYY-MM-DD)
+ *       - in: query
+ *         name: endDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 종료 날짜 (YYYY-MM-DD) - 시작 날짜와 같은 월 내에서만 가능
+ *     responses:
+ *       200:
+ *         description: 날짜 범위별 계획 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PlanListResponse'
+ *       400:
+ *         description: 잘못된 요청 (다른 월의 날짜 범위, 누락된 파라미터 등)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *
  * /api/plans/{planId}:
  *   get:
  *     summary: 특정 계획 조회
@@ -364,6 +421,36 @@ router.get('/week', authMiddleware, async (req, res) => {
 		res.json({
 			code: 200,
 			message: "주간 계획을 성공적으로 조회했습니다.",
+			result: plans
+		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
+});
+
+// GET /api/plans/range - 한 달 기간 내 날짜 범위별 계획 조회
+router.get('/range', authMiddleware, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const { startDate, endDate } = req.query;
+		
+		if (!startDate || !endDate) {
+			return res.status(400).json({
+				code: 400,
+				message: "시작 날짜와 종료 날짜 파라미터가 필요합니다.",
+				result: null
+			});
+		}
+		
+		const plans = await plansServices.findByDateRangeWithinMonth(userId, startDate, endDate);
+		res.json({
+			code: 200,
+			message: "날짜 범위별 계획을 성공적으로 조회했습니다.",
 			result: plans
 		});
 	} catch (error) {
