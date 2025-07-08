@@ -270,6 +270,50 @@ const findByDateRange = async (userId, startDate, endDate) => {
 	return await plansRepository.findByDateRange(userId, startDate, endDate);
 };
 
+// 한 달 기간 내 날짜 범위별 계획 조회
+const findByDateRangeWithinMonth = async (userId, startDate, endDate) => {
+	if (!userId) {
+		const error = new Error('사용자 ID가 필요합니다');
+		error.statusCode = 400;
+		throw error;
+	}
+	
+	if (!startDate || !endDate) {
+		const error = new Error('시작일과 종료일이 필요합니다');
+		error.statusCode = 400;
+		throw error;
+	}
+	
+	const start = new Date(startDate);
+	const end = new Date(endDate);
+	
+	if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+		const error = new Error('올바른 날짜 형식이 아닙니다');
+		error.statusCode = 400;
+		throw error;
+	}
+	
+	if (start > end) {
+		const error = new Error('시작일이 종료일보다 늦을 수 없습니다');
+		error.statusCode = 400;
+		throw error;
+	}
+	
+	// 한 달 기간 내 검증: 시작일과 종료일이 같은 년월에 속해야 함
+	const startYear = start.getFullYear();
+	const startMonth = start.getMonth();
+	const endYear = end.getFullYear();
+	const endMonth = end.getMonth();
+	
+	if (startYear !== endYear || startMonth !== endMonth) {
+		const error = new Error('날짜 범위는 같은 월 내에서만 조회 가능합니다');
+		error.statusCode = 400;
+		throw error;
+	}
+	
+	return await plansRepository.findByDateRange(userId, startDate, endDate);
+};
+
 // 월별 계획 조회
 const findByMonth = async (userId, year, month) => {
 	if (!userId) {
@@ -367,6 +411,7 @@ module.exports = {
 	toggleComplete,
 	findByDate,
 	findByDateRange,
+	findByDateRangeWithinMonth,
 	findByMonth,
 	findByWeek,
 	findToday,
