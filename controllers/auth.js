@@ -90,9 +90,6 @@ const upload = require('../middlewares/upload');
  *               petGender:
  *                 type: string
  *                 enum: [male, female]
- *               petProfileImage:
- *                 type: string
- *                 format: binary
  *     responses:
  *       201:
  *         description: 회원가입 성공
@@ -100,10 +97,7 @@ const upload = require('../middlewares/upload');
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/RegisterResponse'
- *       400:
- *         description: 필수 정보 누락
- *       409:
- *         description: 이미 사용 중인 아이디
+ * 
  * /api/auth/test-token:
  *   get:
  *     summary: 테스트용 토큰 발급
@@ -229,7 +223,6 @@ router.post('/check-loginid', async (req, res) => {
 // POST /api/auth/register - 회원가입
 router.post('/register', upload.fields([
 	{ name: 'profileImage', maxCount: 1 },
-	{ name: 'petProfileImage', maxCount: 1 }
 ]), async (req, res) => {
 	try {
 		const {
@@ -264,7 +257,6 @@ router.post('/register', upload.fields([
 		// 파일 정리 (multipart에서 배열로 오므로 단일 파일로 변환)
 		const files = {
 			profileImage: req.files?.profileImage?.[0],
-			petProfileImage: req.files?.petProfileImage?.[0]
 		};
 
 		// 회원가입 처리 (사용자 + 반려동물 정보 + 프로필 이미지 업로드)

@@ -116,7 +116,7 @@ const { logUserAction } = require('../config/logger');
  *                     data:
  *                       type: array
  *                       items:
- *                         $ref: '#/components/schemas/CommunityContentResponse'
+ *                         $ref: '#/components/schemas/CommunityContentData'
  *                     keyword:
  *                       type: string
  *                     total:

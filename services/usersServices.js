@@ -1,9 +1,23 @@
 const usersRepository = require('../repository/usersRepository');
 const bcrypt = require('bcrypt');
 
+// 사용자 객체 변환 함수 (내부용)
+const _transformUser = (user) => {
+	if (!user) return null;
+
+	// _count.missionMemories를 memoriesCount로 변환
+	const memoriesCount = user._count?.missionMemories || 0;
+	
+	// 원본에서 _count 제거
+	const { _count, ...rest } = user;
+	
+	return { ...rest, memoriesCount };
+};
+
 // 모든 사용자 찾기
 const findAll = async () => {
-	return await usersRepository.findAll();
+	const users = await usersRepository.findAll();
+	return users.map(_transformUser);
 };
 
 const create = async (userData) => {
@@ -23,7 +37,7 @@ const update = async (id, userData) => {
 		error.statusCode = 404;
 		throw error;
 	}
-	return user;
+	return _transformUser(user);
 
 }
 
@@ -35,7 +49,7 @@ const findById = async (id) => {
 		error.statusCode = 404;
 		throw error;
 	}
-	return user;
+	return _transformUser(user);
 };
 
 const findByIdIncludeRefreshToken = async (id) => {
@@ -45,12 +59,12 @@ const findByIdIncludeRefreshToken = async (id) => {
 		error.statusCode = 404;
 		throw error;
 	}
-	return user;
+	return _transformUser(user);
 };
 
 const findByLoginId = async (loginId) => {
 	const user = await usersRepository.findByLoginId(loginId);
-	return user;
+	return _transformUser(user);
 };
 
 const findByNickname = async (nickname) => {
@@ -61,7 +75,7 @@ const findByNickname = async (nickname) => {
 		error.statusCode = 404;
 		throw error;
 	}
-	return user;
+	return _transformUser(user);
 };
 
 // ========== 로그인 플로우 관련 함수들 ==========
@@ -92,7 +106,7 @@ const authenticateUser = async (loginId, password) => {
 
 	// 비밀번호 제거한 사용자 정보 반환
 	const { password: _, ...userWithoutPassword } = user;
-	return userWithoutPassword;
+	return _transformUser(userWithoutPassword);
 };
 
 // 아이디 중복 확인
@@ -125,7 +139,13 @@ const registerUserWithPet = async (registerData, files = {}) => {
 	userData.password = await bcrypt.hash(userData.password, salt);
 
 	// Repository에서 파일 업로드와 DB 저장을 트랜잭션으로 처리
-	return await usersRepository.createUserWithPet(userData, pet, files);
+	const result = await usersRepository.createUserWithPet(userData, pet, files);
+	
+	// 생성된 사용자 정보에도 memoriesCount를 추가 (초기값 0)
+	return {
+		user: _transformUser(result.user),
+		pet: result.pet
+	};
 };
 
 module.exports = { 

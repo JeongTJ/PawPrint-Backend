@@ -91,7 +91,6 @@ const PetInfo = {
 		name: { type: 'string', example: '멍멍이' },
 		birthDate: { type: 'string', format: 'date-time', example: '2020-01-01T00:00:00.000Z' },
 		gender: { type: 'string', enum: ['male', 'female'], example: 'male' },
-		profile: { type: 'string', example: 'https://example.com/pet-profile.jpg' }
 	}
 };
 

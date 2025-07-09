@@ -122,10 +122,6 @@ model Pet {
   name        String
   birthDate   DateTime? @map("birth_date") @db.Date
   gender      String?
-  isNeutering Boolean   @default(false) @map("is_neutering")
-  profile     String?
-  species     String?
-  type        String?
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
   memories    Memory[]
