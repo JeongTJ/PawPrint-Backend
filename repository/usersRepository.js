@@ -9,6 +9,16 @@ const publicUserSelect = {
 	statusNote: true,
 	createdAt: true,
 	updatedAt: true,
+	pets: {
+		select: {
+			id: true,
+			name: true,
+			birthDate: true,
+			gender: true,
+			createdAt: true,
+			updatedAt: true,
+		}
+	}
 	// password, refreshToken, loginId는 제외
 };
 
@@ -159,25 +169,24 @@ const existsByLoginId = async (loginId) => {
 
 // 사용자 프로필 이미지 SAS URL 자동 리프레시 (storageRepository 범용 함수 사용)
 const refreshUserProfileIfExpired = async (user) => {
-	if (!user || !user.profile) return user;
+	if (!user) return user;
 	
-	// storageRepository의 범용 함수 사용
-	const newUrl = await storageRepository.refreshUrlIfExpired(
-		user.profile,
-		'profiles',
-		async (oldUrl, newUrl) => {
-			// DB 업데이트 콜백
-			await prisma.user.update({
-				where: { id: user.id },
-				data: { 
-					profile: newUrl,
-					updatedAt: new Date()
-				}
-			});
-		}
-	);
+	let refreshedProfile = user.profile;
+	if (user.profile) {
+		refreshedProfile = await storageRepository.refreshUrlIfExpired(
+			user.profile,
+			'profiles',
+			async (oldUrl, newUrl) => {
+				await prisma.user.update({
+					where: { id: user.id },
+					data: { profile: newUrl, updatedAt: new Date() }
+				});
+			}
+		);
+	}
 	
-	return { ...user, profile: newUrl };
+	// 반려동물 프로필 URL 갱신 로직은 제거되었으므로 pets는 그대로 반환
+	return { ...user, profile: refreshedProfile, pets: user.pets };
 };
 
 // ========== 로그인 플로우 관련 함수들 ==========
@@ -198,17 +207,6 @@ const createUserWithPet = async (userData, petData, files = {}) => {
 				'profiles'
 			);
 			uploadedFiles.push(userData.profile);
-		}
-
-		if (files.petProfileImage) {
-			const file = files.petProfileImage;
-			petData.profile = await storageRepository.uploadFile(
-				file.buffer, 
-				file.originalname, 
-				file.mimetype, 
-				'pets'
-			);
-			uploadedFiles.push(petData.profile);
 		}
 
 		// 2. DB 트랜잭션으로 사용자와 반려동물 생성
@@ -232,7 +230,7 @@ const createUserWithPet = async (userData, petData, files = {}) => {
 					name: petData.name,
 					birthDate: petData.birthDate,
 					gender: petData.gender,
-					profile: petData.profile,
+					// profile 필드는 여기서 설정하지 않음
 				}
 			});
 

@@ -21,6 +21,7 @@ const ContentWithMediaData = {
 		body: { type: 'string', example: '우리 강아지가 오늘 처음으로 바다를 봤어요! 🐕🌊' },
 		likesCount: { type: 'integer', example: 12 },
 		commentsCount: { type: 'integer', example: 3 },
+		isLiked: { type: 'boolean', example: false, description: '현재 사용자의 좋아요 여부' },
 		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 		media: {
@@ -66,6 +67,7 @@ const QnaContentData = {
 		body: { type: 'string', example: '강아지가 밥을 안 먹어요. 어떻게 해야 할까요?' },
 		likesCount: { type: 'integer', example: 5 },
 		commentsCount: { type: 'integer', example: 8 },
+		isLiked: { type: 'boolean', example: false, description: '현재 사용자의 좋아요 여부' },
 		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T11:00:00.000Z' },
 		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T11:00:00.000Z' },
 		media: {
@@ -98,6 +100,7 @@ const CommunityContentData = {
 		body: { type: 'string', example: '우리 강아지 산책 사진들! 🐕' },
 		likesCount: { type: 'integer', example: 12 },
 		commentsCount: { type: 'integer', example: 3 },
+		isLiked: { type: 'boolean', example: false, description: '현재 사용자의 좋아요 여부' },
 		createdAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 		updatedAt: { type: 'string', format: 'date-time', example: '2024-01-15T10:30:00.000Z' },
 		media: {
@@ -250,6 +253,11 @@ module.exports = {
 	QnaContentListResponse,
 	CommunityContentListResponse,
 	
+	// 데이터 스키마
+	ContentWithMediaData,
+	QnaContentData,
+	CommunityContentData,
+
 	// 요청 스키마
 	ContentCreateRequest,
 	ContentUpdateRequest,
