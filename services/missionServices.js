@@ -184,7 +184,16 @@ const missionMemoryService = {
     getUserMissionMemories: async (userId) => {
         try {
             const memories = await missionMemoryRepository.findByUserId(userId);
-            return { success: true, data: memories };
+
+            // 이미지 데이터를 URL 문자열 배열로 변환
+            const formattedMemories = memories.map(memory => {
+                return {
+                    ...memory,
+                    images: memory.images.map(image => image.imageUrl)
+                };
+            });
+
+            return { success: true, data: formattedMemories };
         } catch (error) {
             return { success: false, error: error.message };
         }
