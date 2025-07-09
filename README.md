@@ -335,6 +335,3 @@ npm start
 - 🌐 서버 주소: http://localhost:3000
 - 📚 API 문서: http://localhost:3000/api-docs
 - 📡 실시간 알림: Supabase Realtime (클라이언트에서 직접 구독)
-
-
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miwibmlja25hbWUiOiLtg4DsoJUiLCJ0eXBlIjoiYWNjZXNzIiwiaWF0IjoxNzUyMDQyOTU2LCJleHAiOjE3NTIwNDY1NTZ9.e0j3fOfh30e6g3R0T2mH8Y3OVD9bfnK6qYrp3lhxSfE
