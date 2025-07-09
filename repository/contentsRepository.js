@@ -11,7 +11,6 @@ const refreshMediaUrlsIfExpired = async (mediaArray) => {
 		mediaArray.map(async (media) => {
 			const newUrl = await storageRepository.refreshUrlIfExpired(
 				media.fileUrl,
-				'contents-images',
 				async (oldUrl, newUrl) => {
 					// DB 업데이트 콜백
 					await prisma.media.update({
@@ -129,88 +128,36 @@ const findByUserId = async (userId) => {
 	return refreshedContents;
 };
 
-// 특정 게시물을 미디어와 함께 생성 (트랜잭션 사용)
-const createWithMedia = async (contentData, mediaFiles = []) => {
-	let uploadedFileUrls = [];
-	
-	try {
-		// 1. 먼저 파일들을 Storage에 업로드
-		if (mediaFiles && mediaFiles.length > 0) {
-			uploadedFileUrls = await storageRepository.uploadMultipleFiles(mediaFiles);
-		}
-		
-		// 2. DB 트랜잭션으로 콘텐츠와 미디어 생성
-		const result = await prisma.$transaction(async (tx) => {
-			const { userId, contentType, body } = contentData;
-			
-			// 콘텐츠 생성
-			const content = await tx.content.create({
-				data: {
-					userId: parseInt(userId),
-					contentType,
-					body
-				}
-			});
-			
-			// 미디어 파일들 DB에 저장
-			const mediaRecords = [];
-			if (uploadedFileUrls.length > 0) {
-				for (const fileUrl of uploadedFileUrls) {
-					const media = await tx.media.create({
-						data: {
-							contentId: content.id,
-							fileUrl
-						}
-					});
-					mediaRecords.push(media);
-				}
-			}
-			
-			return {
-				...content,
-				media: mediaRecords
-			};
-		});
-		
-		console.log(`✅ 콘텐츠 생성 완료 (ID: ${result.id})`);
-		return result;
-		
-	} catch (error) {
-		console.error('❌ 콘텐츠 생성 실패:', error);
-		
-		// 롤백: 업로드된 파일들 삭제
-		if (uploadedFileUrls.length > 0) {
-			try {
-				await storageRepository.deleteMultipleFiles(uploadedFileUrls);
-				console.log('🧹 업로드된 파일 정리 완료');
-			} catch (cleanupError) {
-				console.error('파일 정리 실패:', cleanupError);
-			}
-		}
-		
-		throw error;
-	}
-};
-
-// 미디어 없이 콘텐츠만 생성
-const create = async (contentData) => {
+const create = async (contentData, tx) => {
+	const prismaClient = tx || prisma;
 	const { userId, contentType, body } = contentData;
-	
-	return await prisma.content.create({
+
+	return await prismaClient.content.create({
 		data: {
 			userId: parseInt(userId),
 			contentType,
-			body
+			body,
 		},
-		include: {
-			media: true
-		}
 	});
 };
 
+const createManyMedia = async (contentId, imageUrls, tx) => {
+	const prismaClient = tx || prisma;
+	const mediaData = imageUrls.map((url) => ({
+		contentId,
+		fileUrl: url,
+	}));
+
+	return await prismaClient.media.createMany({
+		data: mediaData,
+	});
+};
+
+
 // ID로 특정 게시물을 미디어와 함께 찾기
-const findById = async (id) => {
-	const content = await prisma.content.findUnique({
+const findById = async (id, tx) => {
+	const prismaClient = tx || prisma;
+	const content = await prismaClient.content.findUnique({
 		where: { id: parseInt(id) },
 		include: {
 			media: {
@@ -251,7 +198,7 @@ const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 			
 			// 새 파일들이 있으면 업로드
 			if (newMediaFiles && newMediaFiles.length > 0) {
-				uploadedFileUrls = await storageRepository.uploadMultipleFiles(newMediaFiles);
+				uploadedFileUrls = await storageRepository.uploadMultipleFiles(newMediaFiles, 'contents-images');
 			}
 			
 			// 기존 미디어 URL들 백업 (롤백용)
@@ -396,7 +343,7 @@ const findMediaByContentId = async (contentId) => {
 	});
 	
 	// 만료된 SAS URL 갱신
-	await refreshExpiredSasUrls([parseInt(contentId)]);
+	await refreshMediaUrlsIfExpired(media);
 	
 	// 최신 데이터 재조회
 	return await prisma.media.findMany({
@@ -585,6 +532,17 @@ const getUserLikedContents = async (userId) => {
 	return likes.map(like => like.content);
 };
 
+// 사용자가 좋아요한 컨텐츠의 ID 목록 조회
+const getUserLikedContentIds = async (userId) => {
+	const likes = await prisma.contentLike.findMany({
+		where: { userId: parseInt(userId) },
+		select: {
+			contentId: true,
+		},
+	});
+	return new Set(likes.map(like => like.contentId));
+};
+
 // ==================== 댓글 관련 함수들 ====================
 
 // 댓글 추가
@@ -727,7 +685,6 @@ module.exports = {
 	findAll,
 	findByContentType,
 	findByUserId,
-	createWithMedia,
 	create,
 	findById,
 	updateWithMedia,
@@ -742,6 +699,7 @@ module.exports = {
 	isLikedByUser,
 	getLikesByContentId,
 	getUserLikedContents,
+	getUserLikedContentIds,
 	// 댓글 관련
 	addComment,
 	getCommentsByContentId,
@@ -749,4 +707,5 @@ module.exports = {
 	updateComment,
 	deleteComment,
 	searchByKeyword,
+	createManyMedia,
 };
