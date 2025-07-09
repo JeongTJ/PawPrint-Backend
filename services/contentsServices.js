@@ -251,7 +251,51 @@ const update = async (id, contentData) => {
 	}
 };
 
-// 게시물과 미디어를 함께 업데이트
+const searchByKeyword = async (keyword) => {
+	try {
+		if (!keyword || typeof keyword !== 'string') {
+			const error = new Error('검색어는 문자열이어야 합니다.');
+			error.statusCode = 400;
+			throw error;
+		}
+
+		const contents = await contentsRepository.searchByKeyword(keyword);
+
+		if (contents.length === 0) {
+			return [];
+		}
+
+		// 유니크한 사용자 ID들 추출
+		const uniqueUserIds = [...new Set(contents.map(content => content.userId))];
+
+		// 작성자 정보들 한 번에 조회
+		const users = await Promise.all(
+			uniqueUserIds.map(userId => usersRepository.findById(userId))
+		);
+
+		// userId를 키로 하는 사용자 정보 맵 생성
+		const userMap = {};
+		users.forEach(user => {
+			if (user) userMap[user.id] = user;
+		});
+
+		// 각 게시물에 작성자 정보 추가 (nickname, profile만)
+		const contentsWithUser = contents.map(content => ({
+			...content,
+			nickname: userMap[content.userId] ? userMap[content.userId].nickname : null,
+			profile: userMap[content.userId] ? userMap[content.userId].profile : null
+		}));
+
+		return contentsWithUser;
+
+	} catch (error) {
+		if (error.statusCode) throw error;
+		console.error('키워드 검색 중 오류:', error);
+		throw new Error('게시물 검색에 실패했습니다.');
+	}
+};
+
+// 미디어 파일과 함께 게시물 업데이트 (교체 방식)
 const updateWithMedia = async (id, contentData, newMediaFiles = null) => {
 	try {
 		if (!id || isNaN(id)) {
@@ -691,7 +735,8 @@ module.exports = {
 	getUserComments,
 	updateComment,
 	deleteComment,
+	searchByKeyword,
 	
 	// 하위 호환성
-	findByType,
+	findByType, // findByContentType으로 대체 권장
 };

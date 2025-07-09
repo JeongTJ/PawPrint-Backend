@@ -83,6 +83,51 @@ const { logUserAction } = require('../config/logger');
  *               items:
  *                 $ref: '#/components/schemas/CommunityContentResponse'
  * 
+ * /api/contents/search:
+ *   get:
+ *     summary: 키워드로 게시물 검색
+ *     tags: [Contents]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keyword
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 검색할 키워드
+ *     responses:
+ *       200:
+ *         description: 검색된 게시물 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: "성공했습니다."
+ *                 result:
+ *                   type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/CommunityContentResponse'
+ *                     keyword:
+ *                       type: string
+ *                     total:
+ *                       type: integer
+ *       400:
+ *         description: 검색어가 누락된 경우
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ * 
  * /api/contents/{id}:
  *   get:
  *     summary: 특정 게시물 조회
@@ -202,6 +247,14 @@ router.get('/community', authMiddleware, async (req, res) => {
 router.get('/search', authMiddleware, async (req, res) => {
 	try {
 		const { keyword } = req.query;
+		
+		if (!keyword) {
+			return res.status(400).json({
+				code: 400,
+				message: '검색어를 입력해주세요.',
+				result: null,
+			});
+		}
 		
 		const contents = await contentsServices.searchByKeyword(keyword);
 		res.json({

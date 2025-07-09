@@ -76,6 +76,36 @@ const findByContentType = async (contentType) => {
 	return refreshedContents;
 };
 
+const searchByKeyword = async (keyword) => {
+	if (!keyword) {
+		return [];
+	}
+
+	const contents = await prisma.content.findMany({
+		where: {
+			body: {
+				contains: keyword,
+			},
+		},
+		include: {
+			media: {
+				orderBy: { id: 'asc' },
+			},
+		},
+		orderBy: { id: 'asc' },
+	});
+
+	// 각 컨텐츠의 미디어 SAS URL 리프레시
+	const refreshedContents = await Promise.all(
+		contents.map(async (content) => ({
+			...content,
+			media: await refreshMediaUrlsIfExpired(content.media),
+		})),
+	);
+
+	return refreshedContents;
+};
+
 // 특정 사용자의 게시물을 미디어와 함께 찾기
 const findByUserId = async (userId) => {
 	const contents = await prisma.content.findMany({
@@ -717,5 +747,6 @@ module.exports = {
 	getCommentsByContentId,
 	getUserComments,
 	updateComment,
-	deleteComment
+	deleteComment,
+	searchByKeyword,
 };
