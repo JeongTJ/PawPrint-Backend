@@ -178,20 +178,46 @@ const dailyMissionService = {
     }
 };
 
+// 미션 추억 객체 포맷팅 헬퍼 함수
+const _formatMemory = (memory, index) => {
+    if (!memory) return null;
+    
+    const {
+        id,
+        content,
+        images,
+        userId,
+        dailyMissionId,
+        createdAt,
+        updatedAt,
+        dailyMission
+    } = memory;
+    
+    return {
+        id,
+        memoryNumber: index !== undefined ? index + 1 : undefined,
+        content,
+        images: images ? images.map(image => image.imageUrl) : [],
+        userId,
+        dailyMissionId,
+        createdAt,
+        updatedAt,
+        dailyMission
+    };
+};
+
+
 // 미션 추억 관련 서비스
 const missionMemoryService = {
     // 사용자의 모든 미션 추억 조회
     getUserMissionMemories: async (userId) => {
         try {
             const memories = await missionMemoryRepository.findByUserId(userId);
+            // 각 추억에 번호를 부여하고 포맷팅
+            const formattedMemories = memories.map(_formatMemory);
 
-            // 이미지 데이터를 URL 문자열 배열로 변환
-            const formattedMemories = memories.map(memory => {
-                return {
-                    ...memory,
-                    images: memory.images.map(image => image.imageUrl)
-                };
-            });
+            // 최신순으로 정렬하여 반환
+            formattedMemories.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
             return { success: true, data: formattedMemories };
         } catch (error) {
@@ -248,11 +274,17 @@ const missionMemoryService = {
                 }));
                 await missionImageRepository.createMany(imageData);
             }
-
-            // 최종 데이터 조회 (이미지 포함)
-            const finalMemory = await missionMemoryRepository.findById(memory.id);
             
-            return { success: true, data: finalMemory };
+            // 생성 후 총 추억 개수 카운트
+            const totalMemories = await missionMemoryRepository.countByUserId(userId);
+            const finalMemory = await missionMemoryRepository.findById(memory.id);
+
+            const formattedMemory = {
+                ..._formatMemory(finalMemory),
+                memoryNumber: totalMemories // 새로 생성된 것이므로 마지막 번호
+            };
+
+            return { success: true, data: formattedMemory };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -273,12 +305,17 @@ const missionMemoryService = {
             const { content } = memoryData;
 
             // 미션 추억 내용 업데이트
-            const updatedMemory = await missionMemoryRepository.update(memoryId, { content });
+            await missionMemoryRepository.update(memoryId, { content });
+
+            // 업데이트된 추억의 번호를 찾기 위해 전체 목록 조회
+            const allUserMemories = await missionMemoryRepository.findByUserId(userId);
+            const memoryIndex = allUserMemories.findIndex(m => m.id === memoryId);
 
             // 최종 데이터 조회 (이미지 포함)
             const finalMemory = await missionMemoryRepository.findById(memoryId);
+            const formattedMemory = _formatMemory(finalMemory, memoryIndex);
             
-            return { success: true, data: finalMemory };
+            return { success: true, data: formattedMemory };
         } catch (error) {
             return { success: false, error: error.message };
         }

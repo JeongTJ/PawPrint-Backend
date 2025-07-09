@@ -89,10 +89,6 @@ const DailyMissionSchema = {
         },
         missionTemplate: {
             $ref: '#/components/schemas/MissionTemplate'
-        },
-        missionMemory: {
-            $ref: '#/components/schemas/MissionMemory',
-            nullable: true
         }
     }
 };
@@ -105,6 +101,23 @@ const MissionMemorySchema = {
             type: 'integer',
             description: '미션 추억 ID'
         },
+        memoryNumber: {
+            type: 'integer',
+            description: '사용자의 몇 번째 추억인지 나타내는 번호'
+        },
+        content: {
+            type: 'string',
+            description: '미션 완료 내용',
+            example: '푸들이와 함께 한강에서 산책했어요!'
+        },
+        images: {
+            type: 'array',
+            description: '미션 완료 이미지 URL 목록',
+            items: {
+                type: 'string',
+                example: 'https://example.com/image.jpg'
+            }
+        },
         userId: {
             type: 'integer',
             description: '사용자 ID'
@@ -112,11 +125,6 @@ const MissionMemorySchema = {
         dailyMissionId: {
             type: 'integer',
             description: '일일 미션 ID'
-        },
-        content: {
-            type: 'string',
-            description: '미션 완료 내용',
-            example: '푸들이와 함께 한강에서 산책했어요!'
         },
         createdAt: {
             type: 'string',
@@ -131,13 +139,6 @@ const MissionMemorySchema = {
         dailyMission: {
             $ref: '#/components/schemas/DailyMission'
         },
-        images: {
-            type: 'array',
-            description: '미션 완료 이미지들',
-            items: {
-                $ref: '#/components/schemas/MissionImage'
-            }
-        }
     }
 };
 
