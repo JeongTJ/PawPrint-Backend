@@ -162,7 +162,14 @@ const missionMemoryRepository = {
                     }
                 }
             },
-            orderBy: { createdAt: 'desc' }
+            orderBy: { createdAt: 'asc' } // 오래된 순으로 정렬
+        });
+    },
+
+    // 사용자의 총 추억 개수 조회
+    countByUserId: async (userId) => {
+        return prisma.missionMemory.count({
+            where: { userId }
         });
     },
 
