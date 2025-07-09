@@ -18,6 +18,11 @@ const publicUserSelect = {
 			createdAt: true,
 			updatedAt: true,
 		}
+	},
+	_count: {
+		select: {
+			missionMemories: true,
+		}
 	}
 	// password, refreshToken, loginId는 제외
 };

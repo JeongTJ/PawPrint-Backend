@@ -24,7 +24,8 @@ const UserResponse = {
 			type: 'array',
 			items: PetResponse,
 			description: '사용자가 등록한 반려동물 목록'
-		}
+		},
+		memoriesCount: { type: 'integer', example: 5, description: '작성한 추억의 총 갯수' },
 	},
 }
 
