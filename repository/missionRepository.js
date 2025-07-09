@@ -150,30 +150,20 @@ const dailyMissionRepository = {
 
 // 미션 추억 관련 함수들
 const missionMemoryRepository = {
-    // 사용자의 모든 미션 추억 조회
+    // 특정 사용자의 모든 미션 추억 조회 (이미지 포함)
     findByUserId: async (userId) => {
-        const memories = await prisma.missionMemory.findMany({
+        return prisma.missionMemory.findMany({
             where: { userId },
             include: {
+                images: true, // 이미지 포함
                 dailyMission: {
                     include: {
                         missionTemplate: true
                     }
-                },
-                images: true
+                }
             },
             orderBy: { createdAt: 'desc' }
         });
-
-        // 각 미션 추억의 이미지 SAS URL 리프레시
-        const refreshedMemories = await Promise.all(
-            memories.map(async (memory) => ({
-                ...memory,
-                images: await refreshMissionImageUrlsIfExpired(memory.images)
-            }))
-        );
-
-        return refreshedMemories;
     },
 
     // 특정 미션 추억 조회
