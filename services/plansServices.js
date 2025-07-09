@@ -1,56 +1,94 @@
 const plansRepository = require('../repository/plansRepository');
-const { getKoreaTodayStart, getKoreaNow } = require('../config/dateUtils');
+const { getKoreaTodayStart, getKoreaNow, getKoreaDayStart, getUTCDateFromString, createKoreaDateTime } = require('../config/dateUtils');
+const moment = require('moment-timezone');
+
+// 알림 시간 계산 유틸리티
+const calculateReminderAt = (planDate, planTime, reminderOption) => {
+	if (!reminderOption) return null;
+
+	const minutes = parseInt(reminderOption, 10);
+	if (isNaN(minutes) || minutes <= 0) {
+		// 유효하지 않은 분 값은 무시
+		return null;
+	}
+
+	try {
+		// 한국 시간 기준으로 planDateTime 생성
+		const planDateTime = moment.tz(
+			planDate + ' ' + (planTime || '09:00:00'),
+			'YYYY-MM-DD HH:mm:ss',
+			'Asia/Seoul'
+		);
+
+		// 분 단위로 알림 시간 계산
+		const reminderDateTime = planDateTime.clone().subtract(minutes, 'minutes');
+		return reminderDateTime.toISOString();
+	} catch (error) {
+		console.error('reminderAt 계산 오류:', error);
+		return null;
+	}
+};
 
 // 입력 검증 함수들
 const validatePlanData = (planData) => {
 	const { title, date, time } = planData;
-	
-	if (!title || title.trim().length === 0) {
+
+	if (title === null || title.trim().length === 0) {
 		const error = new Error('제목을 입력해주세요');
 		error.statusCode = 400;
 		throw error;
 	}
-	
+
 	if (title.length > 100) {
 		const error = new Error('제목은 100자 이하로 입력해주세요');
 		error.statusCode = 400;
 		throw error;
 	}
-	
+
 	if (!date) {
 		const error = new Error('날짜를 입력해주세요');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	// 날짜 형식 검증
-	const planDate = new Date(date);
-	if (isNaN(planDate.getTime())) {
-		const error = new Error('올바른 날짜 형식이 아닙니다');
+
+	// 날짜 및 시간 형식 검증 (YYYY-MM-DD, HH:mm:ss)
+	const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+	if (!dateRegex.test(date) || !moment(date, 'YYYY-MM-DD').isValid()) {
+		const error = new Error('올바른 날짜 형식이 아닙니다 (YYYY-MM-DD)');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	// 시간 형식 검증
+
 	if (time) {
-		const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:([0-5][0-9]))?$/;
+		const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/;
 		if (!timeRegex.test(time)) {
-			const error = new Error('올바른 시간 형식이 아닙니다 (HH:MM 또는 HH:MM:SS)');
+			const error = new Error('올바른 시간 형식이 아닙니다 (HH:mm:ss)');
 			error.statusCode = 400;
 			throw error;
 		}
 	}
-	
-	// 과거 날짜는 허용하지 않음 (오늘은 허용) - 한국 시간 기준
-	const today = getKoreaTodayStart();
-	planDate.setHours(0, 0, 0, 0);
-	
-	if (planDate < today) {
+
+	// 날짜/시간 과거 여부 검증 (한국 시간 기준)
+	const now = moment().tz('Asia/Seoul');
+	const todayDateString = now.format('YYYY-MM-DD');
+
+	// 1. 과거 날짜는 불가
+	if (date < todayDateString) {
 		const error = new Error('과거 날짜에는 일정을 생성할 수 없습니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
+
+	// 2. 오늘 날짜인 경우, 과거 시간은 불가
+	if (date === todayDateString && time) {
+		const planDateTime = moment.tz(`${date} ${time}`, 'YYYY-MM-DD HH:mm:ss', 'Asia/Seoul');
+		if (planDateTime.isBefore(now)) {
+			const error = new Error('현재 시간 이후의 시간으로만 일정을 생성할 수 있습니다');
+			error.statusCode = 400;
+			throw error;
+		}
+	}
+
 	return true;
 };
 
@@ -132,17 +170,27 @@ const findById = async (id) => {
 // 새 계획 생성
 const create = async (userId, planData) => {
 	// 입력 검증
+	console.log('planData', planData);
 	validatePlanData(planData);
-	validateReminderAt(planData.reminderAt);
 	
 	const {
 		title,
 		description,
 		date,
 		time,
-		location,
-		reminderAt
+		reminderOption
 	} = planData;
+	
+	// reminderAt 계산 (reminderOption이 있으면 자동 계산)
+	let calculatedReminderAt = null;
+	if (reminderOption) {
+		calculatedReminderAt = calculateReminderAt(date, time, reminderOption);
+	}
+	console.log('calculatedReminderAt', calculatedReminderAt);
+	// reminderAt 검증
+	if (calculatedReminderAt) {
+		validateReminderAt(calculatedReminderAt);
+	}
 	
 	// 데이터 정리
 	const cleanedData = {
@@ -151,8 +199,7 @@ const create = async (userId, planData) => {
 		description: description?.trim() || null,
 		date,
 		time,
-		location: location?.trim() || null,
-		reminderAt: reminderAt || null
+		reminderAt: calculatedReminderAt || null
 	};
 	
 	// 계획 생성
@@ -166,43 +213,50 @@ const create = async (userId, planData) => {
 const update = async (id, userId, planData) => {
 	// 권한 확인
 	const existingPlan = await checkPermission(id, userId);
-	
+
 	// 수정할 데이터가 있는지 확인
 	if (Object.keys(planData).length === 0) {
 		const error = new Error('수정할 데이터가 없습니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	// 제목이나 날짜가 변경되는 경우 검증
-	if (planData.title !== undefined || planData.date !== undefined) {
-		const dataToValidate = {
-			title: planData.title !== undefined ? planData.title : existingPlan.title,
-			date: planData.date !== undefined ? planData.date : existingPlan.date
-		};
-		validatePlanData(dataToValidate);
+
+	// 데이터 유효성 검증을 위한 객체 생성
+	const dataToValidate = {
+		title: planData.title !== undefined ? planData.title : existingPlan.title,
+		date: planData.date !== undefined ? planData.date : existingPlan.date,
+		time: planData.time !== undefined ? planData.time : existingPlan.time,
+	};
+	validatePlanData(dataToValidate);
+
+	// reminderAt 계산 (reminderOption이 있으면 자동 계산)
+	let calculatedReminderAt = undefined;
+	if (planData.reminderOption !== undefined) {
+		if (planData.reminderOption === null) {
+			calculatedReminderAt = null; // 알림 제거
+		} else {
+			const newDate = planData.date || existingPlan.date;
+			const newTime = planData.time || existingPlan.time;
+			calculatedReminderAt = calculateReminderAt(newDate, newTime, planData.reminderOption);
+			// reminderAt 유효성 검증
+			validateReminderAt(calculatedReminderAt);
+		}
 	}
-	
-	// 알림 시간 검증
-	if (planData.reminderAt !== undefined) {
-		validateReminderAt(planData.reminderAt);
-	}
-	
+
 	// 데이터 정리
-	const updateData = {};
-	if (planData.title !== undefined) updateData.title = planData.title.trim();
-	if (planData.description !== undefined) updateData.description = planData.description?.trim() || null;
-	if (planData.date !== undefined) updateData.date = planData.date;
-	if (planData.time !== undefined) updateData.time = planData.time;
-	if (planData.isCompleted !== undefined) updateData.isCompleted = planData.isCompleted;
-	if (planData.location !== undefined) updateData.location = planData.location?.trim() || null;
-	if (planData.reminderAt !== undefined) updateData.reminderAt = planData.reminderAt;
-	
-	// 계획 업데이트
-	const updatedPlan = await plansRepository.update(id, updateData);
-	
-	// 업데이트된 계획을 다시 조회
-	return await plansRepository.findById(id);
+	const cleanedData = { ...planData };
+	if (cleanedData.title) cleanedData.title = cleanedData.title.trim();
+	if (cleanedData.description) cleanedData.description = cleanedData.description.trim();
+	if (calculatedReminderAt !== undefined) {
+		cleanedData.reminderAt = calculatedReminderAt;
+	}
+	delete cleanedData.reminderOption; // DB에 저장하지 않음
+
+	// 계획 수정
+	const updatedPlan = await plansRepository.update(id, cleanedData);
+
+	// 수정된 계획을 다시 조회하여 반환
+	return await plansRepository.findById(updatedPlan.id);
 };
 
 // 계획 삭제
@@ -221,52 +275,47 @@ const toggleComplete = async (id, userId) => {
 	return await plansRepository.toggleComplete(id);
 };
 
-// 날짜별 계획 조회
+// 특정 날짜의 모든 계획 조회 (YYYY-MM-DD)
 const findByDate = async (userId, date) => {
 	if (!userId) {
 		const error = new Error('사용자 ID가 필요합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	if (!date) {
-		const error = new Error('날짜가 필요합니다');
+
+	// 날짜 형식 검증
+	const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+	if (!dateRegex.test(date)) {
+		const error = new Error('올바른 날짜 형식이 아닙니다 (YYYY-MM-DD)');
 		error.statusCode = 400;
 		throw error;
 	}
-	
+
 	return await plansRepository.findByDate(userId, date);
 };
 
-// 기간별 계획 조회
+// 특정 기간의 모든 계획 조회 (YYYY-MM-DD)
 const findByDateRange = async (userId, startDate, endDate) => {
 	if (!userId) {
 		const error = new Error('사용자 ID가 필요합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	if (!startDate || !endDate) {
-		const error = new Error('시작일과 종료일이 필요합니다');
+
+	// 날짜 형식 검증
+	const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+	if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+		const error = new Error('올바른 날짜 형식이 아닙니다 (YYYY-MM-DD)');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	const start = new Date(startDate);
-	const end = new Date(endDate);
-	
-	if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-		const error = new Error('올바른 날짜 형식이 아닙니다');
+
+	if (startDate > endDate) {
+		const error = new Error('시작 날짜는 종료 날짜보다 이전이어야 합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	if (start > end) {
-		const error = new Error('시작일이 종료일보다 늦을 수 없습니다');
-		error.statusCode = 400;
-		throw error;
-	}
-	
+
 	return await plansRepository.findByDateRange(userId, startDate, endDate);
 };
 
@@ -314,75 +363,62 @@ const findByDateRangeWithinMonth = async (userId, startDate, endDate) => {
 	return await plansRepository.findByDateRange(userId, startDate, endDate);
 };
 
-// 월별 계획 조회
+// 특정 월의 모든 계획 조회 (YYYY, M)
 const findByMonth = async (userId, year, month) => {
 	if (!userId) {
 		const error = new Error('사용자 ID가 필요합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	if (!year || !month) {
-		const error = new Error('년도와 월이 필요합니다');
-		error.statusCode = 400;
-		throw error;
-	}
-	
-	const yearNum = parseInt(year);
-	const monthNum = parseInt(month);
-	
-	if (yearNum < 1900 || yearNum > 2100) {
-		const error = new Error('올바른 년도를 입력해주세요 (1900-2100)');
-		error.statusCode = 400;
-		throw error;
-	}
-	
-	if (monthNum < 1 || monthNum > 12) {
-		const error = new Error('올바른 월을 입력해주세요 (1-12)');
-		error.statusCode = 400;
-		throw error;
-	}
-	
-	return await plansRepository.findByMonth(userId, yearNum, monthNum);
+
+	// moment를 사용하여 해당 월의 시작일과 마지막일 계산
+	const startOfMonth = moment({ year, month: month - 1 }).startOf('month').format('YYYY-MM-DD');
+	const endOfMonth = moment({ year, month: month - 1 }).endOf('month').format('YYYY-MM-DD');
+
+	return await plansRepository.findByDateRange(userId, startOfMonth, endOfMonth);
 };
 
-// 주간 계획 조회
+// 특정 주의 모든 계획 조회 (시작일 기준 YYYY-MM-DD)
 const findByWeek = async (userId, startDate) => {
 	if (!userId) {
 		const error = new Error('사용자 ID가 필요합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	if (!startDate) {
-		const error = new Error('시작 날짜가 필요합니다');
+
+	// 날짜 형식 검증
+	const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+	if (!dateRegex.test(startDate)) {
+		const error = new Error('올바른 날짜 형식이 아닙니다 (YYYY-MM-DD)');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	return await plansRepository.findByWeek(userId, startDate);
+
+	const endDate = moment(startDate).add(6, 'days').format('YYYY-MM-DD');
+	return await plansRepository.findByDateRange(userId, startDate, endDate);
 };
 
-// 오늘의 계획 조회
+// 오늘 계획 조회
 const findToday = async (userId) => {
 	if (!userId) {
 		const error = new Error('사용자 ID가 필요합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	return await plansRepository.findToday(userId);
+	const today = moment().tz('Asia/Seoul').format('YYYY-MM-DD');
+	return await plansRepository.findByDate(userId, today);
 };
 
-// 예정된 계획 조회
+// 다가오는 계획 조회 (기본 7일)
 const findUpcoming = async (userId, days = 7) => {
 	if (!userId) {
 		const error = new Error('사용자 ID가 필요합니다');
 		error.statusCode = 400;
 		throw error;
 	}
-	
-	return await plansRepository.findUpcoming(userId, days);
+	const startDate = moment().tz('Asia/Seoul').format('YYYY-MM-DD');
+	const endDate = moment(startDate).add(days - 1, 'days').format('YYYY-MM-DD');
+	return await plansRepository.findByDateRange(userId, startDate, endDate);
 };
 
 // 미완료 계획 조회
@@ -417,5 +453,6 @@ module.exports = {
 	findToday,
 	findUpcoming,
 	findIncomplete,
-	getPlansWithReminders
+	getPlansWithReminders,
+	calculateReminderAt
 };

@@ -7,7 +7,6 @@ const findAll = async () => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					name: true,
 					profile: true
 				}
@@ -24,7 +23,6 @@ const findAll = async () => {
 					user: {
 						select: {
 							id: true,
-							loginId: true,
 							name: true
 						}
 					}
@@ -43,7 +41,6 @@ const findByContentId = async (contentId) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					name: true,
 					profile: true
 				}
@@ -53,7 +50,6 @@ const findByContentId = async (contentId) => {
 					user: {
 						select: {
 							id: true,
-							loginId: true,
 							name: true
 						}
 					}
@@ -90,7 +86,6 @@ const findById = async (id) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					name: true,
 					profile: true
 				}
@@ -107,7 +102,6 @@ const findById = async (id) => {
 					user: {
 						select: {
 							id: true,
-							loginId: true,
 							name: true
 						}
 					}
@@ -133,7 +127,6 @@ const create = async (commentData) => {
 				user: {
 					select: {
 						id: true,
-						loginId: true,
 						name: true,
 						profile: true
 					}
@@ -173,7 +166,6 @@ const update = async (id, commentData, userId) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					name: true,
 					profile: true
 				}
@@ -289,7 +281,6 @@ const getLikes = async (commentId) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					name: true,
 					profile: true
 				}
@@ -306,7 +297,6 @@ const findRecent = async (limit = 10, offset = 0) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					name: true,
 					profile: true
 				}

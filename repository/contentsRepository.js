@@ -449,7 +449,6 @@ const addLike = async (userId, contentId) => {
 				user: {
 					select: {
 						id: true,
-						loginId: true,
 						nickname: true,
 						profile: true
 					}
@@ -521,7 +520,6 @@ const getLikesByContentId = async (contentId) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					nickname: true,
 					profile: true
 				}
@@ -544,7 +542,6 @@ const getUserLikedContents = async (userId) => {
 					user: {
 						select: {
 							id: true,
-							loginId: true,
 							nickname: true,
 							profile: true
 						}
@@ -574,7 +571,6 @@ const addComment = async (userId, contentId, body) => {
 				user: {
 					select: {
 						id: true,
-						loginId: true,
 						nickname: true,
 						profile: true
 					}
@@ -605,7 +601,6 @@ const getCommentsByContentId = async (contentId) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					nickname: true,
 					profile: true
 				}
@@ -623,7 +618,6 @@ const getUserComments = async (userId) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					nickname: true,
 					profile: true
 				}
@@ -656,7 +650,6 @@ const updateComment = async (commentId, userId, body) => {
 			user: {
 				select: {
 					id: true,
-					loginId: true,
 					nickname: true,
 					profile: true
 				}
