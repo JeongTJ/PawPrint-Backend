@@ -34,6 +34,7 @@ const uploadFile = async (buffer, originalname, mimetype, containerName = 'conte
 	return `${blockBlobClient.url}?${sasToken}`;
 };
 
+
 /**
  * URL에서 blob 이름을 추출하는 유틸리티 함수
  * @param {string} fileUrl - 파일 URL (SAS 토큰 포함 가능)
