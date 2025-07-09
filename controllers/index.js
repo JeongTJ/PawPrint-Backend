@@ -8,8 +8,8 @@ const contentsController = require('./contents');
 const commentsController = require('./comments');
 const plansController = require('./plans');
 const missionController = require('./missions');
-const notificationController = require('./notifications');
 const maintenanceController = require('./maintenance');
+const notificationsController = require('./notifications');
 
 // 인증 라우트
 router.use('/auth', authController);
@@ -29,8 +29,8 @@ router.use('/plans', plansController);
 // 미션 관리 라우트
 router.use('/missions', missionController);
 
-// 알림 관리 라우트 (Supabase 기반)
-router.use('/notifications', notificationController);
+// 알림 관리 라우트
+router.use('/notifications', notificationsController);
 
 // 유지보수 라우트
 router.use('/maintenance', maintenanceController);

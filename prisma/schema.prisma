@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "darwin-arm64", "debian-openssl-3.0.x"]
 }
 
@@ -12,138 +9,116 @@ datasource db {
   directUrl = env("SUPABASE_DIRECT_URL")
 }
 
-// User 테이블
 model User {
-  id            Int   @id @default(autoincrement())
-  loginId       String   @unique @map("login_id")
-  password      String
-  nickname      String   @unique
-  statusNote    String?  @map("status_note")
-  profile       String?
-  refreshToken  String?  @map("refresh_token")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  contents      Content[]
-  comments      Comment[]
-  plans         Plan[]
-  pets          Pet[]
-  contentLikes  ContentLike[]
-  commentLikes  CommentLike[]
-  dailyMissions DailyMission[]
+  id              Int             @id @default(autoincrement())
+  loginId         String          @unique @map("login_id")
+  password        String
+  nickname        String          @unique
+  statusNote      String?         @map("status_note")
+  profile         String?
+  refreshToken    String?         @map("refresh_token")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @default(now()) @updatedAt @map("updated_at")
+  commentLikes    CommentLike[]
+  comments        Comment[]
+  contentLikes    ContentLike[]
+  contents        Content[]
+  dailyMissions   DailyMission[]
   missionMemories MissionMemory[]
+  notifications   Notification[]
+  pets            Pet[]
+  plans           Plan[]
 
   @@map("users")
 }
 
-// Content 테이블
 model Content {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @map("user_id")
-  contentType   String      @map("content_type")
+  id            Int           @id @default(autoincrement())
+  userId        Int           @map("user_id")
+  contentType   String        @map("content_type")
   body          String?
-  likesCount    Int         @default(0) @map("likes_count")
-  commentsCount Int         @default(0) @map("comments_count")
-  createdAt     DateTime    @default(now()) @map("created_at")
-  updatedAt     DateTime    @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likesCount    Int           @default(0) @map("likes_count")
+  commentsCount Int           @default(0) @map("comments_count")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @default(now()) @updatedAt @map("updated_at")
   comments      Comment[]
-  media         Media[]
   contentLikes  ContentLike[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media         Media[]
 
   @@map("contents")
 }
 
-// Comment 테이블
 model Comment {
-  id          Int   @id @default(autoincrement())
-  userId      Int?  @map("user_id")
-  contentId   Int   @map("content_id")
-  body        String
-  likesCount  Int      @default(0) @map("likes_count")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  content      Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  id           Int           @id @default(autoincrement())
+  userId       Int?          @map("user_id")
+  contentId    Int           @map("content_id")
+  body         String
+  likesCount   Int           @default(0) @map("likes_count")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @default(now()) @updatedAt @map("updated_at")
   commentLikes CommentLike[]
+  content      Content       @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id])
 
   @@map("comments")
 }
 
-// Media 테이블
 model Media {
-  id        Int   @id @default(autoincrement())
-  contentId Int   @map("content_id")
+  id        Int      @id @default(autoincrement())
+  contentId Int      @map("content_id")
   fileUrl   String   @map("file_url")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
 
   @@map("media")
 }
 
-// ContentLike 테이블 (콘텐츠 좋아요)
 model ContentLike {
-  id        Int   @id @default(autoincrement())
-  userId    Int   @map("user_id")
-  contentId Int   @map("content_id")
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  contentId Int      @map("content_id")
   createdAt DateTime @default(now()) @map("created_at")
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  content Content @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, contentId])
   @@map("content_likes")
 }
 
-// CommentLike 테이블 (댓글 좋아요)
 model CommentLike {
-  id        Int   @id @default(autoincrement())
-  userId    Int   @map("user_id")
-  commentId Int   @map("comment_id")
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  commentId Int      @map("comment_id")
   createdAt DateTime @default(now()) @map("created_at")
-
-  // Relations
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, commentId])
   @@map("comment_likes")
 }
 
-// Plan 테이블
 model Plan {
-  id          Int       @id @default(autoincrement())
-  userId      Int       @map("user_id")
-  title       String
-  description String?
-  date        DateTime  @db.Date
-  time        DateTime? @db.Time
-  isCompleted Boolean   @default(false) @map("is_completed")
-  location    String?
-  reminderAt  DateTime? @map("reminder_at") // 알림 시간 (선택적)
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  missions Mission[]
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  title        String
+  date         String    // YYYY-MM-DD
+  time         String?   // HH:mm:ss
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+  description  String?
+  isCompleted  Boolean   @default(false) @map("is_completed")
+  reminderAt   DateTime? @map("reminder_at")
+  reminderSent Boolean   @default(false) @map("reminder_sent")
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("plans")
 }
 
-// Pet 테이블
 model Pet {
-  id          Int    @id @default(autoincrement())
-  userId      Int    @map("user_id")
+  id          Int       @id @default(autoincrement())
+  userId      Int       @map("user_id")
   name        String
   birthDate   DateTime? @map("birth_date") @db.Date
   gender      String?
@@ -153,18 +128,14 @@ model Pet {
   type        String?
   createdAt   DateTime  @default(now()) @map("created_at")
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  memories Memory[]
+  memories    Memory[]
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("pets")
 }
 
-// Mission 테이블
 model Mission {
-  id           Int   @id @default(autoincrement())
-  planId       Int   @map("plan_id")
+  id           Int      @id @default(autoincrement())
   title        String
   description  String?
   missionOrder Int?     @map("mission_order")
@@ -172,122 +143,116 @@ model Mission {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations
-  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
-
   @@map("missions")
 }
 
-// Memory 테이블
 model Memory {
-  id        Int   @id @default(autoincrement())
-  petId     Int   @map("pet_id")
+  id        Int            @id @default(autoincrement())
+  petId     Int            @map("pet_id")
   body      String?
-  date      DateTime? @db.Date
+  date      DateTime?      @db.Date
   count     Int?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  pet  Pet               @relation(fields: [petId], references: [id], onDelete: Cascade)
-  tags MemoryTagMap[]
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at")
+  pet       Pet            @relation(fields: [petId], references: [id], onDelete: Cascade)
+  tags      MemoryTagMap[]
 
   @@map("memories")
 }
 
-// Tag 테이블
 model Tag {
-  id        Int   @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  memories MemoryTagMap[]
+  id        Int            @id @default(autoincrement())
+  name      String         @unique
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at")
+  memories  MemoryTagMap[]
 
   @@map("tags")
 }
 
-// MemoryTagMap 테이블 (다대다 관계)
 model MemoryTagMap {
-  id       Int   @id @default(autoincrement())
-  memoryId Int   @map("memory_id")
-  tagId    Int   @map("tag_id")
+  id        Int      @id @default(autoincrement())
+  memoryId  Int      @map("memory_id")
+  tagId     Int      @map("tag_id")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  memory Memory @relation(fields: [memoryId], references: [id], onDelete: Cascade)
-  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  memory    Memory   @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([memoryId, tagId])
   @@map("memory_tag_maps")
 }
 
-// MissionTemplate 테이블 (일일 미션 템플릿)
 model MissionTemplate {
-  id          Int    @id @default(autoincrement())
-  category    String // 미션 카테고리 (예: 운동, 건강, 교육 등)
-  title       String // 미션 제목
-  description String // 미션 설명
-  order       Int    // 미션 순서
-  isActive    Boolean @default(true) @map("is_active") // 활성화 여부
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
+  id            Int            @id @default(autoincrement())
+  category      String
+  title         String
+  description   String
+  order         Int
+  isActive      Boolean        @default(true) @map("is_active")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at")
   dailyMissions DailyMission[]
 
   @@map("mission_templates")
 }
 
-// DailyMission 테이블 (사용자별 일일 미션)
 model DailyMission {
-  id                Int       @id @default(autoincrement())
-  userId            Int       @map("user_id")
-  missionTemplateId Int       @map("mission_template_id")
-  date              DateTime  @db.Date // 미션 날짜
-  isCompleted       Boolean   @default(false) @map("is_completed")
-  completedAt       DateTime? @map("completed_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+  id                Int             @id @default(autoincrement())
+  userId            Int             @map("user_id")
+  missionTemplateId Int             @map("mission_template_id")
+  date              DateTime        @db.Date
+  isCompleted       Boolean         @default(false) @map("is_completed")
+  completedAt       DateTime?       @map("completed_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at")
+  missionTemplate   MissionTemplate @relation(fields: [missionTemplateId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  missionMemory     MissionMemory?
 
-  // Relations
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  missionTemplate MissionTemplate  @relation(fields: [missionTemplateId], references: [id], onDelete: Cascade)
-  missionMemory   MissionMemory?
-
-  @@unique([userId, missionTemplateId, date]) // 같은 날 같은 미션은 하나만
+  @@unique([userId, missionTemplateId, date])
   @@map("daily_missions")
 }
 
-// MissionMemory 테이블 (완료된 미션의 추억)
 model MissionMemory {
-  id            Int    @id @default(autoincrement())
-  userId        Int    @map("user_id")
-  dailyMissionId Int   @unique @map("daily_mission_id")
-  content       String // 미션 완료 내용
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  dailyMission DailyMission @relation(fields: [dailyMissionId], references: [id], onDelete: Cascade)
-  images       MissionImage[]
+  id             Int            @id @default(autoincrement())
+  userId         Int            @map("user_id")
+  dailyMissionId Int            @unique @map("daily_mission_id")
+  content        String
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at")
+  images         MissionImage[]
+  dailyMission   DailyMission   @relation(fields: [dailyMissionId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("mission_memories")
 }
 
-// MissionImage 테이블 (미션 추억 이미지)
 model MissionImage {
-  id              Int    @id @default(autoincrement())
-  missionMemoryId Int    @map("mission_memory_id")
-  imageUrl        String @map("image_url")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
-
-  // Relations
-  missionMemory MissionMemory @relation(fields: [missionMemoryId], references: [id], onDelete: Cascade)
+  id              Int           @id @default(autoincrement())
+  missionMemoryId Int           @map("mission_memory_id")
+  imageUrl        String        @map("image_url")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @default(now()) @updatedAt @map("updated_at")
+  missionMemory   MissionMemory @relation(fields: [missionMemoryId], references: [id], onDelete: Cascade)
 
   @@map("mission_images")
-} 
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  type      String   // 'comment', 'plan_reminder', 'mission_complete', etc.
+  title     String
+  body      String
+  data      Json?    // 추가 데이터 (contentId, commentId 등)
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("notifications")
+}
+
+

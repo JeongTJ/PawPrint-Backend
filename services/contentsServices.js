@@ -1,5 +1,6 @@
 const contentsRepository = require('../repository/contentsRepository');
 const usersRepository = require('../repository/usersRepository');
+const notificationsServices = require('./notificationsServices');
 
 // 모든 게시물을 미디어와 함께 찾기
 const findAll = async () => {
@@ -527,7 +528,24 @@ const createComment = async (userId, contentId, body) => {
 			throw error;
 		}
 		
-		return await contentsRepository.addComment(userId, contentId, body.trim());
+		// 댓글 생성
+		const comment = await contentsRepository.addComment(userId, contentId, body.trim());
+		
+		// 댓글 알림 생성 (비동기로 처리하여 댓글 생성 성공에 영향 주지 않음)
+		try {
+			await notificationsServices.createCommentNotification(
+				content.userId,      // 게시물 작성자 ID
+				userId,             // 댓글 작성자 ID
+				contentId,          // 게시물 ID
+				comment.id,         // 댓글 ID
+				body.trim()         // 댓글 내용
+			);
+		} catch (notificationError) {
+			// 알림 생성 실패해도 댓글 생성 자체는 성공
+			console.error('댓글 알림 생성 중 오류:', notificationError);
+		}
+		
+		return comment;
 	} catch (error) {
 		if (error.statusCode) throw error;
 		console.error('댓글 생성 중 오류:', error);

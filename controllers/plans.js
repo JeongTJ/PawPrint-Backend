@@ -2,6 +2,19 @@ const express = require('express');
 const router  = express.Router();
 const plansServices = require('../services/plansServices');
 const { authMiddleware } = require('../middlewares/auth');
+const { formatKoreaDate } = require('../config/dateUtils');
+
+// Plan 객체의 날짜 필드를 한국 시간 문자열로 포맷팅하는 헬퍼 함수
+const formatPlanResponse = (plan) => {
+	if (!plan) return null;
+
+	// reminderAt이 Date 객체인 경우에만 포맷팅
+	if (plan.reminderAt && plan.reminderAt instanceof Date) {
+		plan.reminderAt = formatKoreaDate(plan.reminderAt, 'YYYY-MM-DD HH:mm:ss');
+	}
+
+	return plan;
+};
 
 /**
  * @openapi
@@ -266,10 +279,11 @@ router.get('/', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id;
 		const plans = await plansServices.findByUserId(userId);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "계획 목록을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -285,11 +299,13 @@ router.get('/', authMiddleware, async (req, res) => {
 router.post('/', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id;
-		const plan = await plansServices.create(userId, req.body);
+		const planData = req.body;
+		const newPlan = await plansServices.create(userId, planData);
+		const formattedPlan = formatPlanResponse(newPlan);
 		res.status(201).json({
-			code: 200,
+			code: 201,
 			message: "계획이 성공적으로 생성되었습니다.",
-			result: plan
+			result: formattedPlan
 		});
 	} catch (error) {
 		console.log('error', error);
@@ -307,10 +323,11 @@ router.get('/today', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id;
 		const plans = await plansServices.findToday(userId);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "오늘의 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -328,10 +345,11 @@ router.get('/upcoming', authMiddleware, async (req, res) => {
 		const userId = req.user.id;
 		const days = parseInt(req.query.days) || 7;
 		const plans = await plansServices.findUpcoming(userId, days);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "예정된 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -358,10 +376,11 @@ router.get('/month', authMiddleware, async (req, res) => {
 		}
 		
 		const plans = await plansServices.findByMonth(userId, year, month);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "월별 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -388,10 +407,11 @@ router.get('/date', authMiddleware, async (req, res) => {
 		}
 		
 		const plans = await plansServices.findByDate(userId, date);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "해당 날짜의 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -418,10 +438,11 @@ router.get('/week', authMiddleware, async (req, res) => {
 		}
 		
 		const plans = await plansServices.findByWeek(userId, startDate);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "주간 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -448,10 +469,11 @@ router.get('/range', authMiddleware, async (req, res) => {
 		}
 		
 		const plans = await plansServices.findByDateRangeWithinMonth(userId, startDate, endDate);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "날짜 범위별 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -468,10 +490,11 @@ router.get('/incomplete', authMiddleware, async (req, res) => {
 	try {
 		const userId = req.user.id;
 		const plans = await plansServices.findIncomplete(userId);
+		const formattedPlans = plans.map(formatPlanResponse);
 		res.json({
 			code: 200,
 			message: "미완료 계획을 성공적으로 조회했습니다.",
-			result: plans
+			result: formattedPlans
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -488,9 +511,10 @@ router.get('/:planId', authMiddleware, async (req, res) => {
 	try {
 		const { planId } = req.params;
 		const plan = await plansServices.findById(planId);
+		const formattedPlan = formatPlanResponse(plan);
 		
 		// 권한 확인 (본인의 계획인지)
-		if (plan.userId !== req.user.id) {
+		if (formattedPlan.userId !== req.user.id) {
 			return res.status(403).json({
 				code: 400,
 				message: "이 계획에 대한 권한이 없습니다.",
@@ -501,7 +525,7 @@ router.get('/:planId', authMiddleware, async (req, res) => {
 		res.json({
 			code: 200,
 			message: "계획을 성공적으로 조회했습니다.",
-			result: plan
+			result: formattedPlan
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -518,12 +542,14 @@ router.patch('/:planId', authMiddleware, async (req, res) => {
 	try {
 		const { planId } = req.params;
 		const userId = req.user.id;
-		const plan = await plansServices.update(planId, userId, req.body);
+		const planData = req.body;
+		const updatedPlan = await plansServices.update(planId, userId, planData);
+		const formattedPlan = formatPlanResponse(updatedPlan);
 		
 		res.json({
 			code: 200,
 			message: "계획이 성공적으로 수정되었습니다.",
-			result: plan
+			result: formattedPlan
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
@@ -562,12 +588,13 @@ router.post('/:planId/toggle', authMiddleware, async (req, res) => {
 	try {
 		const { planId } = req.params;
 		const userId = req.user.id;
-		const plan = await plansServices.toggleComplete(planId, userId);
+		const updatedPlan = await plansServices.toggleComplete(planId, userId);
+		const formattedPlan = formatPlanResponse(updatedPlan);
 		
 		res.json({
 			code: 200,
-			message: plan.isCompleted ? "계획을 완료로 표시했습니다." : "계획을 미완료로 표시했습니다.",
-			result: plan
+			message: formattedPlan.isCompleted ? "계획을 완료로 표시했습니다." : "계획을 미완료로 표시했습니다.",
+			result: formattedPlan
 		});
 	} catch (error) {
 		const statusCode = error.statusCode || 500;

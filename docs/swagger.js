@@ -44,6 +44,20 @@ const {
 const { 
 	schemas: missionSchemas
 } = require('./missionSchemas');
+const {
+	NotificationData,
+	PaginationData,
+	NotificationListData,
+	NotificationListResponse,
+	UnreadCountData,
+	UnreadCountResponse,
+	NotificationStatsData,
+	NotificationStatsResponse,
+	NotificationActionData,
+	NotificationActionResponse,
+	TestNotificationRequest,
+	TestNotificationResponse
+} = require('./notificationSchemas');
 
 const options = {
 	definition: {
@@ -136,6 +150,19 @@ const options = {
 				CheckLoginIdData: CheckLoginIdData,
 				RegisterData: RegisterData,
 				PetInfo: PetInfo,
+
+				// ==================== Notification Schemas ====================
+				NotificationData: NotificationData,
+				NotificationListData: NotificationListData,
+				NotificationListResponse: NotificationListResponse,
+				UnreadCountData: UnreadCountData,
+				UnreadCountResponse: UnreadCountResponse,
+				NotificationStatsData: NotificationStatsData,
+				NotificationStatsResponse: NotificationStatsResponse,
+				NotificationActionData: NotificationActionData,
+				NotificationActionResponse: NotificationActionResponse,
+				TestNotificationRequest: TestNotificationRequest,
+				TestNotificationResponse: TestNotificationResponse,
 			},
 		},
 		security: [{ bearerAuth: [] }],
@@ -174,6 +201,10 @@ const options = {
 		{
 			name: 'Mission Memories',
 			description: '완료된 미션의 추억 관리 API',
+		},
+		{
+			name: 'notifications',
+			description: '인앱 알림 관리 API',
 		},
 	],
 };

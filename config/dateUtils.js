@@ -90,6 +90,24 @@ const getUTCDateFromString = (dateString) => {
 	return new Date(dateString + 'T00:00:00.000Z');
 };
 
+/**
+ * 한국 시간 기준으로 날짜와 시간을 설정한 Date 객체 생성
+ * @param {string} dateString YYYY-MM-DD 형식의 날짜 문자열
+ * @param {string} timeString HH:MM:SS 형식의 시간 문자열 (선택사항)
+ * @returns {Date} 한국 시간 기준으로 설정된 Date 객체
+ */
+const createKoreaDateTime = (dateString, timeString = null) => {
+	if (timeString) {
+		// 날짜와 시간을 모두 설정
+		const koreaDateTime = moment.tz(dateString + ' ' + timeString, 'YYYY-MM-DD HH:mm:ss', 'Asia/Seoul');
+		return koreaDateTime.toDate();
+	} else {
+		// 날짜만 설정 (기본 00:00:00)
+		const koreaDateTime = moment.tz(dateString, 'YYYY-MM-DD', 'Asia/Seoul');
+		return koreaDateTime.toDate();
+	}
+};
+
 module.exports = {
 	getKoreaTodayStart,
 	getKoreaNow,
@@ -99,5 +117,6 @@ module.exports = {
 	getKoreaTimeString,
 	isSameDayInKorea,
 	isToday,
-	getUTCDateFromString
+	getUTCDateFromString,
+	createKoreaDateTime
 }; 
