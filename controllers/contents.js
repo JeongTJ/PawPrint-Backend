@@ -188,7 +188,8 @@ const { logUserAction } = require('../config/logger');
 // GET /api/contents - 모든 게시물을 미디어와 함께 조회
 router.get('/', authMiddleware, async (req, res) => {
 	try {
-		const contents = await contentsServices.findAll();
+		const userId = req.user.id;
+		const contents = await contentsServices.findAll(userId);
 		res.json({
 			code: 200,
 			message: "성공했습니다.",
@@ -207,7 +208,8 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.get('/qna', authMiddleware, async (req, res) => {
 	try {
-		const contents = await contentsServices.findByContentType('qna');
+		const userId = req.user.id;
+		const contents = await contentsServices.findByContentType('qna', userId);
 		res.json({
 			code: 200,
 			message: "성공했습니다.",
@@ -226,7 +228,8 @@ router.get('/qna', authMiddleware, async (req, res) => {
 
 router.get('/community', authMiddleware, async (req, res) => {
 	try {
-		const contents = await contentsServices.findByContentType('community');
+		const userId = req.user.id;
+		const contents = await contentsServices.findByContentType('community', userId);
 		res.json({
 			code: 200,
 			message: "성공했습니다.",
@@ -247,6 +250,7 @@ router.get('/community', authMiddleware, async (req, res) => {
 router.get('/search', authMiddleware, async (req, res) => {
 	try {
 		const { keyword } = req.query;
+		const userId = req.user.id;
 		
 		if (!keyword) {
 			return res.status(400).json({
@@ -256,7 +260,7 @@ router.get('/search', authMiddleware, async (req, res) => {
 			});
 		}
 		
-		const contents = await contentsServices.searchByKeyword(keyword);
+		const contents = await contentsServices.searchByKeyword(keyword, userId);
 		res.json({
 			code: 200,
 			message: "성공했습니다.",
@@ -280,7 +284,8 @@ router.get('/search', authMiddleware, async (req, res) => {
 router.get('/:id', authMiddleware, async (req, res) => {
 	try {
 		const { id } = req.params;
-		const content = await contentsServices.findById(id);
+		const userId = req.user.id;
+		const content = await contentsServices.findById(id, userId);
 		res.json({
 			code: 200,
 			message: "성공했습니다.",

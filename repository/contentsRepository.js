@@ -532,6 +532,17 @@ const getUserLikedContents = async (userId) => {
 	return likes.map(like => like.content);
 };
 
+// 사용자가 좋아요한 컨텐츠의 ID 목록 조회
+const getUserLikedContentIds = async (userId) => {
+	const likes = await prisma.contentLike.findMany({
+		where: { userId: parseInt(userId) },
+		select: {
+			contentId: true,
+		},
+	});
+	return new Set(likes.map(like => like.contentId));
+};
+
 // ==================== 댓글 관련 함수들 ====================
 
 // 댓글 추가
@@ -688,6 +699,7 @@ module.exports = {
 	isLikedByUser,
 	getLikesByContentId,
 	getUserLikedContents,
+	getUserLikedContentIds,
 	// 댓글 관련
 	addComment,
 	getCommentsByContentId,

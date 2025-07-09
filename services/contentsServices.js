@@ -5,9 +5,12 @@ const notificationsServices = require('./notificationsServices');
 const storageRepository = require('../repository/storageRepository');
 
 // 모든 게시물을 미디어와 함께 찾기
-const findAll = async () => {
+const findAll = async (userId) => {
 	try {
-		const contents = await contentsRepository.findAll();
+		const [contents, likedContentIds] = await Promise.all([
+			contentsRepository.findAll(),
+			userId ? contentsRepository.getUserLikedContentIds(userId) : new Set()
+		]);
 		
 		if (contents.length === 0) {
 			return contents;
@@ -31,7 +34,8 @@ const findAll = async () => {
 		const contentsWithUser = contents.map(content => ({
 			...content,
 			nickname: userMap[content.userId] ? userMap[content.userId].nickname : null,
-			profile: userMap[content.userId] ? userMap[content.userId].profile : null
+			profile: userMap[content.userId] ? userMap[content.userId].profile : null,
+			isLiked: likedContentIds.has(content.id)
 		}));
 		
 		return contentsWithUser;
@@ -42,7 +46,7 @@ const findAll = async () => {
 };
 
 // 특정 타입의 게시물들을 미디어와 함께 찾기
-const findByContentType = async (content_type) => {
+const findByContentType = async (content_type, userId) => {
 	try {
 		// 유효한 content_type 검증
 		if (!['qna', 'community'].includes(content_type)) {
@@ -51,7 +55,10 @@ const findByContentType = async (content_type) => {
 			throw error;
 		}
 		
-		const contents = await contentsRepository.findByContentType(content_type);
+		const [contents, likedContentIds] = await Promise.all([
+			contentsRepository.findByContentType(content_type),
+			userId ? contentsRepository.getUserLikedContentIds(userId) : new Set()
+		]);
 		
 		if (contents.length === 0) {
 			return contents;
@@ -75,7 +82,8 @@ const findByContentType = async (content_type) => {
 		const contentsWithUser = contents.map(content => ({
 			...content,
 			nickname: userMap[content.userId] ? userMap[content.userId].nickname : null,
-			profile: userMap[content.userId] ? userMap[content.userId].profile : null
+			profile: userMap[content.userId] ? userMap[content.userId].profile : null,
+			isLiked: likedContentIds.has(content.id)
 		}));
 		
 		return contentsWithUser;
@@ -87,28 +95,32 @@ const findByContentType = async (content_type) => {
 };
 
 // 특정 사용자의 게시물들을 미디어와 함께 찾기
-const findByUserId = async (userId) => {
+const findByUserId = async (targetUserId, currentUserId) => {
 	try {
-		if (!userId || isNaN(userId)) {
+		if (!targetUserId || isNaN(targetUserId)) {
 			const error = new Error('유효하지 않은 사용자 ID입니다.');
 			error.statusCode = 400;
 			throw error;
 		}
 		
-		const contents = await contentsRepository.findByUserId(userId);
+		const [contents, likedContentIds] = await Promise.all([
+			contentsRepository.findByUserId(targetUserId),
+			currentUserId ? contentsRepository.getUserLikedContentIds(currentUserId) : new Set()
+		]);
 		
 		if (contents.length === 0) {
 			return contents;
 		}
 		
 		// 작성자 정보 조회 (모든 게시물이 같은 사용자의 것이므로 한 번만 조회)
-		const user = await usersRepository.findById(parseInt(userId));
+		const user = await usersRepository.findById(parseInt(targetUserId));
 		
 		// 각 게시물에 작성자 정보 추가 (nickname, profile만)
 		const contentsWithUser = contents.map(content => ({
 			...content,
 			nickname: user ? user.nickname : null,
-			profile: user ? user.profile : null
+			profile: user ? user.profile : null,
+			isLiked: likedContentIds.has(content.id)
 		}));
 		
 		return contentsWithUser;
@@ -120,7 +132,7 @@ const findByUserId = async (userId) => {
 };
 
 // 특정 게시물을 미디어와 함께 ID로 찾기
-const findById = async (id) => {
+const findById = async (id, userId) => {
 	try {
 		if (!id || isNaN(id)) {
 			const error = new Error('유효하지 않은 게시물 ID입니다.');
@@ -128,7 +140,10 @@ const findById = async (id) => {
 			throw error;
 		}
 		
-		const content = await contentsRepository.findById(id);
+		const [content, isLiked] = await Promise.all([
+			contentsRepository.findById(id),
+			userId ? contentsRepository.isLikedByUser(userId, id) : false
+		]);
 
 		if (!content) {
 			const error = new Error(`ID ${id}에 해당하는 게시물을 찾을 수 없습니다.`);
@@ -143,7 +158,8 @@ const findById = async (id) => {
 		const contentWithUser = {
 			...content,
 			nickname: user ? user.nickname : null,
-			profile: user ? user.profile : null
+			profile: user ? user.profile : null,
+			isLiked
 		};
 		
 		return contentWithUser;
@@ -278,7 +294,7 @@ const update = async (id, contentData) => {
 	}
 };
 
-const searchByKeyword = async (keyword) => {
+const searchByKeyword = async (keyword, userId) => {
 	try {
 		if (!keyword || typeof keyword !== 'string') {
 			const error = new Error('검색어는 문자열이어야 합니다.');
@@ -286,7 +302,10 @@ const searchByKeyword = async (keyword) => {
 			throw error;
 		}
 
-		const contents = await contentsRepository.searchByKeyword(keyword);
+		const [contents, likedContentIds] = await Promise.all([
+			contentsRepository.searchByKeyword(keyword),
+			userId ? contentsRepository.getUserLikedContentIds(userId) : new Set()
+		]);
 
 		if (contents.length === 0) {
 			return [];
@@ -310,7 +329,8 @@ const searchByKeyword = async (keyword) => {
 		const contentsWithUser = contents.map(content => ({
 			...content,
 			nickname: userMap[content.userId] ? userMap[content.userId].nickname : null,
-			profile: userMap[content.userId] ? userMap[content.userId].profile : null
+			profile: userMap[content.userId] ? userMap[content.userId].profile : null,
+			isLiked: likedContentIds.has(content.id)
 		}));
 
 		return contentsWithUser;
