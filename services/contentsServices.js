@@ -1,6 +1,8 @@
+const { prisma } = require('../config/dbConfig');
 const contentsRepository = require('../repository/contentsRepository');
 const usersRepository = require('../repository/usersRepository');
 const notificationsServices = require('./notificationsServices');
+const storageRepository = require('../repository/storageRepository');
 
 // 모든 게시물을 미디어와 함께 찾기
 const findAll = async () => {
@@ -180,38 +182,63 @@ const create = async (contentData) => {
 
 // 미디어 파일과 함께 게시물 생성
 const createWithMedia = async (contentData, mediaFiles = []) => {
+	// 입력 데이터 검증
+	const { userId, contentType, body } = contentData;
+	if (!userId || !contentType || !body) {
+		const error = new Error('필수 필드가 누락되었습니다. (userId, contentType, body)');
+		error.statusCode = 400;
+		throw error;
+	}
+	if (!['qna', 'community'].includes(contentType)) {
+		const error = new Error('유효하지 않은 게시물 타입입니다. (qna, community만 허용)');
+		error.statusCode = 400;
+		throw error;
+	}
+	if (contentType === 'qna' && mediaFiles && mediaFiles.length > 0) {
+		const error = new Error('Q&A 게시물에는 이미지를 첨부할 수 없습니다.');
+		error.statusCode = 400;
+		throw error;
+	}
+	if (mediaFiles && mediaFiles.length > 5) {
+		const error = new Error('이미지는 최대 5개까지만 첨부할 수 있습니다.');
+		error.statusCode = 400;
+		throw error;
+	}
+
+	let uploadedFileUrls = [];
 	try {
-		// 입력 데이터 검증
-		const { userId, contentType, body } = contentData;
-		
-		if (!userId || !contentType || !body) {
-			const error = new Error('필수 필드가 누락되었습니다. (userId, contentType, body)');
-			error.statusCode = 400;
-			throw error;
+		// 1. 파일 스토리지에 업로드
+		if (mediaFiles && mediaFiles.length > 0) {
+			uploadedFileUrls = await storageRepository.uploadMultipleFiles(
+				mediaFiles,
+				'contents-images'
+			);
 		}
-		
-		if (!['qna', 'community'].includes(contentType)) {
-			const error = new Error('유효하지 않은 게시물 타입입니다. (qna, community만 허용)');
-			error.statusCode = 400;
-			throw error;
-		}
-		
-		// QNA 게시물에 이미지 첨부 시도 검증 (DB 트리거가 있지만 미리 체크)
-		if (contentType === 'qna' && mediaFiles && mediaFiles.length > 0) {
-			const error = new Error('Q&A 게시물에는 이미지를 첨부할 수 없습니다.');
-			error.statusCode = 400;
-			throw error;
-		}
-		
-		// 미디어 파일 개수 제한 (5개까지)
-		if (mediaFiles && mediaFiles.length > 5) {
-			const error = new Error('이미지는 최대 5개까지만 첨부할 수 있습니다.');
-			error.statusCode = 400;
-			throw error;
-		}
-		
-		return await contentsRepository.createWithMedia(contentData, mediaFiles);
+
+		// 2. DB 작업을 트랜잭션으로 처리
+		const newContentWithMedia = await prisma.$transaction(async (tx) => {
+			// 게시물 생성
+			const newContent = await contentsRepository.create({ userId, contentType, body }, tx);
+
+			// 미디어 정보 저장
+			if (uploadedFileUrls.length > 0) {
+				await contentsRepository.createManyMedia(newContent.id, uploadedFileUrls, tx);
+			}
+			
+			// 생성된 전체 정보 다시 조회
+			const result = await contentsRepository.findById(newContent.id, tx);
+			return result;
+		});
+
+		return newContentWithMedia;
+
 	} catch (error) {
+		// 롤백: 오류 발생 시 업로드된 파일 삭제
+		if (uploadedFileUrls.length > 0) {
+			console.log(`🧹 롤백: 오류로 인해 업로드된 파일 ${uploadedFileUrls.length}개를 삭제합니다.`);
+			await storageRepository.deleteMultipleFiles(uploadedFileUrls);
+		}
+
 		if (error.statusCode) throw error;
 		console.error('미디어 포함 게시물 생성 중 오류:', error);
 		throw new Error('게시물 생성에 실패했습니다.');
