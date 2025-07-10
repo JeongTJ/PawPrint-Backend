@@ -168,7 +168,7 @@ const options = {
 		security: [{ bearerAuth: [] }],
 	},
 	// Swagger 주석을 읽어들일 파일 경로
-	apis: ['./controllers/*.js', './docs/missionPaths.js'],
+	apis: ['./controllers/*.js'],
 	tags: [
 		{
 			name: 'Plans',

@@ -153,6 +153,46 @@ const createManyMedia = async (contentId, imageUrls, tx) => {
 	});
 };
 
+/**
+ * 게시물과 미디어를 트랜잭션으로 함께 생성합니다.
+ * @param {object} contentData - { userId, contentType, body, media: [{ fileUrl }] }
+ * @returns {Promise<object>} - 생성된 게시물과 미디어 정보를 포함한 객체
+ */
+const createContentWithMedia = async (contentData) => {
+	const { userId, contentType, body, media } = contentData;
+
+	return await prisma.$transaction(async (tx) => {
+		// 1. Content 생성
+		const newContent = await tx.content.create({
+			data: {
+				userId: parseInt(userId),
+				contentType,
+				body,
+			},
+		});
+
+		// 2. Media 생성
+		if (media && media.length > 0) {
+			const mediaData = media.map(m => ({
+				contentId: newContent.id,
+				fileUrl: m.fileUrl,
+			}));
+			
+			await tx.media.createMany({
+				data: mediaData,
+			});
+		}
+        
+        // 3. 생성된 전체 정보 반환
+        const result = await tx.content.findUnique({
+            where: { id: newContent.id },
+            include: { media: true }
+        });
+
+		return result;
+	});
+};
+
 
 // ID로 특정 게시물을 미디어와 함께 찾기
 const findById = async (id, tx) => {
@@ -708,4 +748,5 @@ module.exports = {
 	deleteComment,
 	searchByKeyword,
 	createManyMedia,
+	createContentWithMedia, // 추가
 };

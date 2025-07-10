@@ -4,8 +4,9 @@ const {
     missionMemoryRepository,
     missionImageRepository 
 } = require('../repository/missionRepository');
+const contentsRepository = require('../repository/contentsRepository'); // 추가
 const { getKoreaTodayStart, getKoreaNow, formatKoreaDate, getUTCDateFromString } = require('../config/dateUtils');
-const { uploadFile, uploadMultipleFiles, deleteFile } = require('../repository/storageRepository');
+const { uploadFile, uploadMultipleFiles, deleteFile, copyBlob } = require('../repository/storageRepository'); // copyBlob 추가
 const moment = require('moment-timezone');
 
 // 미션 템플릿 관련 서비스
@@ -185,6 +186,7 @@ const _formatMemory = (memory, index) => {
     const {
         id,
         content,
+        isLiked, // isLiked 추가
         images,
         userId,
         dailyMissionId,
@@ -197,6 +199,7 @@ const _formatMemory = (memory, index) => {
         id,
         memoryNumber: index !== undefined ? index + 1 : undefined,
         content,
+        isLiked, // isLiked 추가
         images: images ? images.map(image => image.imageUrl) : [],
         userId,
         dailyMissionId,
@@ -225,7 +228,68 @@ const missionMemoryService = {
         }
     },
 
+    // 미션 추억 좋아요 토글
+    toggleMissionMemoryLike: async (memoryId, userId) => {
+        try {
+            // 1. 추억이 존재하는지, 그리고 내 소유인지 확인
+            const memory = await missionMemoryRepository.findById(memoryId);
+            if (!memory) {
+                return { success: false, error: '해당 미션 추억을 찾을 수 없습니다.' };
+            }
+            if (memory.userId !== userId) {
+                return { success: false, error: '자신의 미션 추억만 좋아요를 누를 수 있습니다.' };
+            }
 
+            // 2. 좋아요 상태 토글
+            const updatedMemory = await missionMemoryRepository.toggleLike(memoryId);
+
+            return { success: true, data: updatedMemory };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    /**
+     * 미션 추억을 커뮤니티 게시물로 공유합니다.
+     * @param {number} userId - 작업을 요청한 사용자 ID
+     * @param {number} memoryId - 공유할 미션 추억 ID
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+     */
+    shareMemoryToCommunity: async (userId, memoryId) => {
+        try {
+            // 1. 원본 미션 추억 조회
+            const memory = await missionMemoryRepository.findById(memoryId);
+            if (!memory || !memory.content) { // memory.content가 있는지도 확인
+                return { success: false, error: '공유할 미션 추억 또는 내용이 없습니다.' };
+            }
+            if (memory.userId !== userId) {
+                return { success: false, error: '자신의 미션 추억만 공유할 수 있습니다.' };
+            }
+
+            // 2. 이미지 파일 복제
+            const sourceImageUrls = memory.images.map(img => img.imageUrl);
+            const copyPromises = sourceImageUrls.map(url => copyBlob(url, 'contents-images'));
+            const newImageUrls = await Promise.all(copyPromises);
+            
+            // 3. 복제된 이미지 URL과 원본 추억의 본문을 사용하여 새 게시물 생성
+            const newContentData = {
+                userId,
+                body: memory.content, // 원본 추억의 content를 사용
+                category: 'COMMUNITY'  // 공유 게시물은 'COMMUNITY' 카테고리로 고정
+            };
+            const newImageObjects = newImageUrls.map(url => ({
+                url: url,
+                type: 'image'
+            }));
+
+            const newContent = await contentsRepository.createContentWithMedia(newContentData, newImageObjects);
+
+            return { success: true, data: newContent };
+        } catch (error) {
+            console.error(`Error sharing memory to community:`, error);
+            return { success: false, error: '미션 추억 공유 중 오류가 발생했습니다.' };
+        }
+    },
 
     // 미션 추억 생성
     createMissionMemory: async (userId, memoryData, files) => {

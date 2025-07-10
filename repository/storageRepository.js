@@ -345,17 +345,61 @@ const refreshUrlIfExpired = async (url, updateCallback) => {
 	return newUrl;
 };
 
+/**
+ * blob을 복사하고 새 SAS URL을 반환합니다.
+ * @param {string} sourceUrl - 복사할 원본 파일의 전체 URL
+ * @param {string} [destContainerName] - (선택) 복사될 컨테이너 이름. 지정하지 않으면 원본과 동일한 컨테이너 사용.
+ * @returns {Promise<string>} - 복사된 새 파일의 SAS URL
+ */
+async function copyBlob(sourceUrl, destContainerName) {
+    const { containerName: sourceContainerName, blobName: sourceBlobName } = extractContainerAndBlobName(sourceUrl);
+
+    if (!sourceContainerName || !sourceBlobName) {
+        throw new Error(`원본 URL에서 Blob 정보를 추출할 수 없습니다: ${sourceUrl}`);
+    }
+
+    const targetContainerName = destContainerName || sourceContainerName;
+
+    const sourceContainerClient = blobServiceClient.getContainerClient(sourceContainerName);
+    const destContainerClient = blobServiceClient.getContainerClient(targetContainerName);
+    await destContainerClient.createIfNotExists();
+
+    const sourceBlobClient = sourceContainerClient.getBlobClient(sourceBlobName);
+    
+    // 원본 파일의 확장자를 유지하면서 새 이름 생성
+    const extension = sourceBlobName.includes('.') ? sourceBlobName.substring(sourceBlobName.lastIndexOf('.')) : '';
+    const newBlobName = `${uuidv4()}${extension}`;
+    const destBlobClient = destContainerClient.getBlobClient(newBlobName);
+
+    // 복사 작업 시작
+    const copyPoller = await destBlobClient.beginCopyFromURL(sourceBlobClient.url);
+    await copyPoller.pollUntilDone();
+    logger.info(`Blob 복사 완료: '${sourceBlobName}' -> '${newBlobName}' in container '${targetContainerName}'`);
+
+    // 복사된 새 Blob에 대한 SAS 토큰 생성 (기본 24시간 유효)
+    const sasOptions = {
+        containerName: targetContainerName,
+        blobName: newBlobName,
+        permissions: BlobSASPermissions.parse("r"),
+        startsOn: new Date(),
+        expiresOn: new Date(new Date().valueOf() + 24 * 60 * 60 * 1000), // 24시간
+    };
+
+    const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
+    return `${destBlobClient.url}?${sasToken}`;
+}
+
 module.exports = {
 	uploadFile,
-    uploadStream, // 추가
-	uploadMultipleFiles,
 	deleteFile,
 	deleteMultipleFiles,
-	extractBlobNameFromUrl,
+	uploadMultipleFiles,
 	regenerateSasUrl,
-	regenerateMultipleSasUrls,
-	isSasUrlExpired,
-	// 범용 SAS URL 리프레시
-	refreshUrlIfExpired,
-	moveBlobToPermanentStorage
+    regenerateMultipleSasUrls,
+    isSasUrlExpired,
+    refreshUrlIfExpired,
+    extractBlobNameFromUrl,
+    uploadStream,
+    moveBlobToPermanentStorage,
+    copyBlob, // 추가
 }; 
