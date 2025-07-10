@@ -186,6 +186,7 @@ const _formatMemory = (memory, index) => {
     const {
         id,
         content,
+        isLiked, // isLiked 추가
         images,
         userId,
         dailyMissionId,
@@ -198,6 +199,7 @@ const _formatMemory = (memory, index) => {
         id,
         memoryNumber: index !== undefined ? index + 1 : undefined,
         content,
+        isLiked, // isLiked 추가
         images: images ? images.map(image => image.imageUrl) : [],
         userId,
         dailyMissionId,
@@ -221,6 +223,27 @@ const missionMemoryService = {
             formattedMemories.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
             return { success: true, data: formattedMemories };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    // 미션 추억 좋아요 토글
+    toggleMissionMemoryLike: async (memoryId, userId) => {
+        try {
+            // 1. 추억이 존재하는지, 그리고 내 소유인지 확인
+            const memory = await missionMemoryRepository.findById(memoryId);
+            if (!memory) {
+                return { success: false, error: '해당 미션 추억을 찾을 수 없습니다.' };
+            }
+            if (memory.userId !== userId) {
+                return { success: false, error: '자신의 미션 추억만 좋아요를 누를 수 있습니다.' };
+            }
+
+            // 2. 좋아요 상태 토글
+            const updatedMemory = await missionMemoryRepository.toggleLike(memoryId);
+
+            return { success: true, data: updatedMemory };
         } catch (error) {
             return { success: false, error: error.message };
         }

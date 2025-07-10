@@ -315,6 +315,33 @@ const upload = require('../middlewares/upload');
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *
+ * /api/missions/memories/{id}/likes:
+ *   patch:
+ *     summary: 미션 추억 좋아요 토글
+ *     tags: [Mission Memories]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: 좋아요를 토글할 미션 추억의 ID
+ *     responses:
+ *       '200':
+ *         description: '성공적으로 좋아요 상태가 변경된 추억 정보'
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MissionMemory'
+ *       '401':
+ *         description: '인증 실패'
+ *       '403':
+ *         description: '권한 없음'
+ *       '404':
+ *         description: '존재하지 않는 미션 추억'
+ *
  * /api/missions/memories/{id}/images:
  *   get:
  *     summary: 미션 추억의 모든 이미지 조회
@@ -773,6 +800,38 @@ router.post('/memories', authMiddleware, upload.array('images', 10), async (req,
 			message: "미션 추억이 성공적으로 생성되었습니다.",
 			result: result.data
 		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
+});
+
+router.patch('/memories/:id/likes', authMiddleware, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const { id } = req.params;
+
+		const result = await missionMemoryService.toggleMissionMemoryLike(parseInt(id), userId);
+
+		if (!result.success) {
+			const statusCode = result.error.includes('찾을 수 없습니다') ? 404 : (result.error.includes('권한') ? 403 : 400);
+			return res.status(statusCode).json({
+				code: statusCode,
+				message: result.error,
+				result: null
+			});
+		}
+
+		res.json({
+			code: 200,
+			message: "미션 추억의 좋아요 상태가 변경되었습니다.",
+			result: result.data
+		});
+
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
 		res.status(statusCode).json({

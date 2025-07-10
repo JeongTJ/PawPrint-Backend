@@ -200,6 +200,22 @@ const missionMemoryRepository = {
         };
     },
 
+    // 미션 추억 좋아요 토글
+    toggleLike: async (memoryId) => {
+        const memory = await prisma.missionMemory.findUnique({
+            where: { id: memoryId }
+        });
+
+        if (!memory) {
+            throw new Error('해당 미션 추억을 찾을 수 없습니다.');
+        }
+
+        return await prisma.missionMemory.update({
+            where: { id: memoryId },
+            data: { isLiked: !memory.isLiked },
+        });
+    },
+
     // 특정 일일 미션의 추억 조회
     findByDailyMissionId: async (dailyMissionId) => {
         const memory = await prisma.missionMemory.findUnique({
