@@ -4,8 +4,9 @@ const {
     missionMemoryRepository,
     missionImageRepository 
 } = require('../repository/missionRepository');
+const contentsRepository = require('../repository/contentsRepository'); // 추가
 const { getKoreaTodayStart, getKoreaNow, formatKoreaDate, getUTCDateFromString } = require('../config/dateUtils');
-const { uploadFile, uploadMultipleFiles, deleteFile } = require('../repository/storageRepository');
+const { uploadFile, uploadMultipleFiles, deleteFile, copyBlob } = require('../repository/storageRepository'); // copyBlob 추가
 const moment = require('moment-timezone');
 
 // 미션 템플릿 관련 서비스
@@ -225,7 +226,48 @@ const missionMemoryService = {
         }
     },
 
+    /**
+     * 미션 추억을 커뮤니티 게시물로 공유합니다.
+     * @param {number} userId - 작업을 요청한 사용자 ID
+     * @param {number} memoryId - 공유할 미션 추억 ID
+     * @param {string} body - 게시물에 작성할 내용
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+     */
+    shareMemoryToCommunity: async (userId, memoryId, body) => {
+        try {
+            // 1. 원본 미션 추억 조회
+            const memory = await missionMemoryRepository.findById(memoryId);
+            if (!memory) {
+                return { success: false, error: '공유할 미션 추억을 찾을 수 없습니다.' };
+            }
+            if (memory.userId !== userId) {
+                return { success: false, error: '자신의 미션 추억만 공유할 수 있습니다.' };
+            }
 
+            // 2. 이미지 파일 복제
+            const sourceImageUrls = memory.images.map(img => img.imageUrl);
+            const copyPromises = sourceImageUrls.map(url => copyBlob(url, 'contents-images'));
+            const newImageUrls = await Promise.all(copyPromises);
+
+            // 3. 게시물 데이터 준비
+            const contentData = {
+                userId,
+                contentType: 'community', // 또는 적절한 타입
+                body,
+                media: newImageUrls.map(url => ({ fileUrl: url }))
+            };
+            
+            // 4. 트랜잭션으로 게시물과 미디어 정보 생성
+            const newContent = await contentsRepository.createContentWithMedia(contentData);
+
+            return { success: true, data: newContent };
+        } catch (error) {
+            // 실패 시 복사된 파일들을 삭제하는 보상 로직을 추가할 수 있으나,
+            // 지금은 단순화를 위해 에러만 반환합니다.
+            console.error('Share to community failed:', error);
+            return { success: false, error: '게시물 공유에 실패했습니다.' };
+        }
+    },
 
     // 미션 추억 생성
     createMissionMemory: async (userId, memoryData, files) => {
