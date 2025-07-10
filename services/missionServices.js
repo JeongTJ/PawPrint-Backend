@@ -230,15 +230,14 @@ const missionMemoryService = {
      * 미션 추억을 커뮤니티 게시물로 공유합니다.
      * @param {number} userId - 작업을 요청한 사용자 ID
      * @param {number} memoryId - 공유할 미션 추억 ID
-     * @param {string} body - 게시물에 작성할 내용
      * @returns {Promise<{success: boolean, data?: any, error?: string}>}
      */
-    shareMemoryToCommunity: async (userId, memoryId, body) => {
+    shareMemoryToCommunity: async (userId, memoryId) => {
         try {
             // 1. 원본 미션 추억 조회
             const memory = await missionMemoryRepository.findById(memoryId);
-            if (!memory) {
-                return { success: false, error: '공유할 미션 추억을 찾을 수 없습니다.' };
+            if (!memory || !memory.content) { // memory.content가 있는지도 확인
+                return { success: false, error: '공유할 미션 추억 또는 내용이 없습니다.' };
             }
             if (memory.userId !== userId) {
                 return { success: false, error: '자신의 미션 추억만 공유할 수 있습니다.' };
@@ -248,24 +247,24 @@ const missionMemoryService = {
             const sourceImageUrls = memory.images.map(img => img.imageUrl);
             const copyPromises = sourceImageUrls.map(url => copyBlob(url, 'contents-images'));
             const newImageUrls = await Promise.all(copyPromises);
-
-            // 3. 게시물 데이터 준비
-            const contentData = {
-                userId,
-                contentType: 'community', // 또는 적절한 타입
-                body,
-                media: newImageUrls.map(url => ({ fileUrl: url }))
-            };
             
-            // 4. 트랜잭션으로 게시물과 미디어 정보 생성
-            const newContent = await contentsRepository.createContentWithMedia(contentData);
+            // 3. 복제된 이미지 URL과 원본 추억의 본문을 사용하여 새 게시물 생성
+            const newContentData = {
+                userId,
+                body: memory.content, // 원본 추억의 content를 사용
+                category: 'COMMUNITY'  // 공유 게시물은 'COMMUNITY' 카테고리로 고정
+            };
+            const newImageObjects = newImageUrls.map(url => ({
+                url: url,
+                type: 'image'
+            }));
+
+            const newContent = await contentsRepository.createContentWithMedia(newContentData, newImageObjects);
 
             return { success: true, data: newContent };
         } catch (error) {
-            // 실패 시 복사된 파일들을 삭제하는 보상 로직을 추가할 수 있으나,
-            // 지금은 단순화를 위해 에러만 반환합니다.
-            console.error('Share to community failed:', error);
-            return { success: false, error: '게시물 공유에 실패했습니다.' };
+            console.error(`Error sharing memory to community:`, error);
+            return { success: false, error: '미션 추억 공유 중 오류가 발생했습니다.' };
         }
     },
 

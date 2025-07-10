@@ -289,19 +289,6 @@ const upload = require('../middlewares/upload');
  *         description: '공유할 미션 추억의 ID'
  *         schema:
  *           type: integer
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               body:
- *                 type: string
- *                 description: '새로 작성할 게시물의 내용'
- *                 example: '우리 강아지랑 미션 성공했어요! 너무 귀엽죠?'
- *             required:
- *               - body
  *     responses:
  *       '201':
  *         description: '성공적으로 공유 및 생성된 게시물 정보'
@@ -310,7 +297,7 @@ const upload = require('../middlewares/upload');
  *             schema:
  *               $ref: '#/components/schemas/ContentWithMediaResponse'
  *       '400':
- *         description: '잘못된 요청 (예: 내용 누락, 존재하지 않는 추억 ID)'
+ *         description: '잘못된 요청 (예: 존재하지 않는 추억 ID)'
  *         content:
  *           application/json:
  *             schema:
@@ -733,14 +720,9 @@ router.get('/memories', authMiddleware, async (req, res) => {
 router.post('/memories/:memoryId/share', authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const { memoryId } = req.params;
-    const { body } = req.body;
-
-    if (!body) {
-        return res.status(400).json({ code: 400, message: '게시물 내용이 필요합니다.', result: null });
-    }
 
     try {
-        const result = await missionMemoryService.shareMemoryToCommunity(userId, parseInt(memoryId), body);
+        const result = await missionMemoryService.shareMemoryToCommunity(userId, parseInt(memoryId));
         
         if (result.success) {
             return res.status(201).json({ 
