@@ -261,6 +261,50 @@ const createWithMedia = async (contentData, mediaFiles = []) => {
 	}
 };
 
+/**
+ * AI가 생성한 비디오로 게시물을 생성합니다.
+ * @param {string} userId - 사용자 ID
+ * @param {string} body - 게시물 내용
+ * @param {string} videoId - AI 비디오 식별 ID (blob 이름)
+ * @returns {Promise<Object>} - 생성된 게시물 정보 (미디어 포함)
+ */
+const createContentWithVideo = async (userId, body, videoId) => {
+    const contentType = 'community'; // 비디오 게시물은 항상 community 타입
+    if (!userId || !body || !videoId) {
+        const error = new Error('필수 필드가 누락되었습니다. (userId, body, videoId)');
+        error.statusCode = 400;
+        throw error;
+    }
+
+    try {
+        // 1. 임시 비디오를 영구 저장소로 이동하고 영구 URL을 받습니다.
+        const permanentVideoUrl = await storageRepository.moveBlobToPermanentStorage(videoId);
+
+        // 2. DB 작업을 트랜잭션으로 처리합니다.
+        const newContentWithVideo = await prisma.$transaction(async (tx) => {
+            // 게시물 본문 생성
+            const newContent = await contentsRepository.create({ userId, contentType, body }, tx);
+
+            // 미디어 정보(영구 비디오 URL) 저장
+            await contentsRepository.createManyMedia(newContent.id, [permanentVideoUrl], tx);
+            
+            // 생성된 전체 정보 다시 조회
+            return await contentsRepository.findById(newContent.id, tx);
+        });
+
+        return newContentWithVideo;
+
+    } catch (error) {
+        if (error.statusCode) throw error;
+        // Azure 관련 에러 메시지 처리
+        if (error.message.includes('임시 비디오')) {
+            error.statusCode = 404;
+        }
+		console.error('AI 비디오 게시물 생성 중 오류:', error);
+		throw new Error('AI 비디오 게시물 생성에 실패했습니다.');
+    }
+};
+
 // 게시물 내용만 업데이트 (미디어 변경 없음)
 const update = async (id, contentData) => {
 	try {
@@ -755,35 +799,27 @@ const deleteComment = async (commentId, userId) => {
 	}
 };
 
-module.exports = { 
-	// 기본 CRUD
-	findAll, 
-	findById,
+module.exports = {
+	findAll,
 	findByContentType,
 	findByUserId,
-	create, 
-	update, 
-	deleteById,
-	
-	// 미디어 관련 기능
+	findById,
+	create,
 	createWithMedia,
+    createContentWithVideo,
+	update,
+	searchByKeyword,
 	updateWithMedia,
+	deleteById,
 	findMediaByContentId,
 	deleteMediaById,
-	
-	// 좋아요 관련
 	toggleLike,
 	getContentLikes,
 	getUserLikedContents,
-	
-	// 댓글 관련
 	createComment,
 	getContentComments,
 	getUserComments,
 	updateComment,
 	deleteComment,
-	searchByKeyword,
-	
-	// 하위 호환성
-	findByType, // findByContentType으로 대체 권장
+	findByType,
 };

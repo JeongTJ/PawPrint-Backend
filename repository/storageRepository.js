@@ -1,6 +1,7 @@
 const { blobServiceClient, sharedKeyCredential } = require('../config/azureStorage');
 const { v4: uuidv4 } = require('uuid');
 const { BlobSASPermissions, generateBlobSASQueryParameters } = require('@azure/storage-blob');
+const { logger } = require('../config/logger');
 
 /**
  * 파일을 Azure Blob Storage에 업로드하고 SAS URL을 반환합니다.
@@ -34,6 +35,91 @@ const uploadFile = async (buffer, originalname, mimetype, containerName = 'conte
 	return `${blockBlobClient.url}?${sasToken}`;
 };
 
+/**
+ * 스트림을 Azure Blob Storage에 업로드하고 SAS URL과 blob 이름을 반환합니다.
+ * @param {ReadableStream} stream - 업로드할 파일 스트림
+ * @param {string} blobName - 저장될 파일의 이름 (확장자 포함)
+ * @param {string} mimetype - 파일의 MIME 타입 (e.g., 'video/mp4')
+ * @param {string} containerName - 컨테이너 이름
+ * @param {number} expirationHours - SAS 토큰 만료 시간 (시간 단위)
+ * @returns {Promise<{url: string, blobName: string}>} - 업로드된 파일의 SAS URL과 고유 blob 이름
+ */
+const uploadStream = async (stream, blobName, mimetype, containerName, expirationHours = 24) => {
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    await containerClient.createIfNotExists();
+
+    const uniqueBlobName = `${uuidv4()}-${blobName}`;
+    const blockBlobClient = containerClient.getBlockBlobClient(uniqueBlobName);
+
+    // 스트림 업로드
+    await blockBlobClient.uploadStream(stream, undefined, undefined, {
+        blobHTTPHeaders: { blobContentType: mimetype }
+    });
+
+    // --- SAS 토큰 생성 로직 ---
+    const sasOptions = {
+        containerName: containerName,
+        blobName: uniqueBlobName,
+        permissions: BlobSASPermissions.parse("r"), // 읽기 전용
+        startsOn: new Date(),
+        expiresOn: new Date(new Date().valueOf() + expirationHours * 60 * 60 * 1000),
+    };
+
+    const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
+    
+    return {
+        url: `${blockBlobClient.url}?${sasToken}`,
+        blobName: uniqueBlobName
+    };
+};
+
+/**
+ * 임시 저장소의 blob을 영구 저장소로 복사(이동)하고 새 SAS URL을 반환합니다.
+ * @param {string} blobName - 이동할 blob의 이름 (videoId)
+ * @param {string} tempContainerName - 임시 컨테이너 이름
+ * @param {string} permanentContainerName - 영구 컨테이너 이름
+ * @returns {Promise<string>} - 영구 저장소에 저장된 파일의 새 SAS URL
+ */
+const moveBlobToPermanentStorage = async (
+    blobName, 
+    tempContainerName = 'temp-videos', 
+    permanentContainerName = 'slideshow-videos'
+) => {
+    const tempContainerClient = blobServiceClient.getContainerClient(tempContainerName);
+    const permanentContainerClient = blobServiceClient.getContainerClient(permanentContainerName);
+    await permanentContainerClient.createIfNotExists();
+
+    const sourceBlobClient = tempContainerClient.getBlobClient(blobName);
+    const destBlobClient = permanentContainerClient.getBlobClient(blobName); // 동일한 이름 사용
+
+    // 1. 소스 blob이 존재하는지 확인
+    const exists = await sourceBlobClient.exists();
+    if (!exists) {
+        throw new Error(`임시 비디오(ID: ${blobName})를 찾을 수 없습니다. 만료되었을 수 있습니다.`);
+    }
+
+    // 2. 영구 컨테이너로 복사 시작
+    const copyPoller = await destBlobClient.beginCopyFromURL(sourceBlobClient.url);
+    await copyPoller.pollUntilDone();
+    logger.info(`Blob 복사 완료: ${blobName} from ${tempContainerName} to ${permanentContainerName}`);
+
+    // 3. 원본 임시 blob 삭제
+    await sourceBlobClient.delete();
+    logger.info(`원본 임시 Blob 삭제 완료: ${blobName} in ${tempContainerName}`);
+
+    // 4. 영구 저장된 blob에 대한 새 SAS 토큰 생성
+    const sasOptions = {
+        containerName: permanentContainerName,
+        blobName: blobName,
+        permissions: BlobSASPermissions.parse("r"),
+        startsOn: new Date(),
+        expiresOn: new Date(new Date().valueOf() + 365 * 24 * 60 * 60 * 1000), // 1년짜리 긴 만료시간
+    };
+
+    const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
+    return `${destBlobClient.url}?${sasToken}`;
+};
+
 
 /**
  * URL에서 blob 이름을 추출하는 유틸리티 함수
@@ -53,37 +139,52 @@ const extractBlobNameFromUrl = (fileUrl) => {
 };
 
 /**
- * Azure Blob Storage에서 파일을 삭제합니다.
+ * URL에서 컨테이너와 blob 이름을 추출하고 디코딩하는 유틸리티 함수
+ * @param {string} fileUrl - 전체 파일 URL
+ * @returns {{containerName: string|null, blobName: string|null}}
+ */
+const extractContainerAndBlobName = (fileUrl) => {
+	try {
+		const url = new URL(fileUrl);
+		const pathParts = url.pathname.split('/').filter(p => p); // 빈 문자열 제거
+		if (pathParts.length < 2) return { containerName: null, blobName: null };
+
+		const containerName = pathParts[0];
+		const blobName = decodeURIComponent(pathParts.slice(1).join('/'));
+		return { containerName, blobName };
+	} catch (error) {
+		logger.error('URL 파싱 오류:', { url: fileUrl, error: error.message });
+		return { containerName: null, blobName: null };
+	}
+};
+
+/**
+ * Azure Blob Storage에서 파일을 삭제합니다. (컨테이너 자동 감지)
  * @param {string} fileUrl - 삭제할 파일의 URL
- * @param {string} containerName - 컨테이너 이름 (기본값: 'contents-images')
  * @returns {Promise<boolean>} - 삭제 성공 여부
  */
-const deleteFile = async (fileUrl, containerName = 'contents-images') => {
+const deleteFile = async (fileUrl) => {
 	try {
-		const blobName = extractBlobNameFromUrl(fileUrl);
-		
-		if (!blobName) {
-			console.error('유효하지 않은 파일 URL:', fileUrl);
-			return false;
+		const { containerName, blobName } = extractContainerAndBlobName(fileUrl);
+		if (!containerName || !blobName) {
+			throw new Error('유효하지 않은 파일 URL에서 컨테이너와 blob 이름을 추출할 수 없습니다.');
 		}
 
 		const containerClient = blobServiceClient.getContainerClient(containerName);
 		const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 		
-		// 파일이 존재하는지 확인
 		const exists = await blockBlobClient.exists();
 		if (!exists) {
-			console.warn('삭제하려는 파일이 존재하지 않습니다:', fileUrl);
-			return true; // 이미 없으므로 성공으로 간주
+			logger.warn('삭제하려는 파일이 존재하지 않습니다:', fileUrl);
+			return true;
 		}
 
-		// 파일 삭제
 		await blockBlobClient.delete();
-		console.log('파일 삭제 성공:', fileUrl);
+		logger.info('파일 삭제 성공:', fileUrl);
 		return true;
 		
 	} catch (error) {
-		console.error('파일 삭제 실패:', fileUrl, error);
+		logger.error('파일 삭제 실패:', { url: fileUrl, error: error.message });
 		return false;
 	}
 };
@@ -126,48 +227,40 @@ const uploadMultipleFiles = async (files, containerName = 'contents-images') => 
 };
 
 /**
- * 기존 blob에 대해 새로운 SAS URL을 생성합니다.
- * @param {string} fileUrl - 기존 파일 URL (만료된 SAS 토큰 포함 가능)
- * @param {string} containerName - 컨테이너 이름 (기본값: 'contents-images')
+ * 기존 blob에 대해 새로운 SAS URL을 생성합니다. (컨테이너 자동 감지)
+ * @param {string} fileUrl - 기존 파일 URL
  * @param {number} expirationHours - SAS 토큰 만료 시간 (시간 단위, 기본값: 24시간)
  * @returns {Promise<string|null>} - 새로운 SAS URL 또는 null (실패 시)
  */
-const regenerateSasUrl = async (fileUrl, containerName = 'contents-images', expirationHours = 24) => {
+const regenerateSasUrl = async (fileUrl, expirationHours = 24) => {
 	try {
-		const blobName = extractBlobNameFromUrl(fileUrl);
-		
-		if (!blobName) {
-			console.error('유효하지 않은 파일 URL:', fileUrl);
-			return null;
+		const { containerName, blobName } = extractContainerAndBlobName(fileUrl);
+		if (!containerName || !blobName) {
+			throw new Error('유효하지 않은 파일 URL에서 컨테이너와 blob 이름을 추출할 수 없습니다.');
 		}
 
 		const containerClient = blobServiceClient.getContainerClient(containerName);
 		const blockBlobClient = containerClient.getBlockBlobClient(blobName);
 		
-		// 파일이 존재하는지 확인
 		const exists = await blockBlobClient.exists();
 		if (!exists) {
-			console.error('파일이 존재하지 않습니다:', fileUrl);
+			logger.error('SAS URL을 재생성하려는 파일이 존재하지 않습니다:', fileUrl);
 			return null;
 		}
 
-		// 새로운 SAS 토큰 생성
 		const sasOptions = {
-			containerName: containerName,
-			blobName: blobName,
-			permissions: BlobSASPermissions.parse("r"), // 읽기 전용 권한
-			startsOn: new Date(),
+			containerName,
+			blobName,
+			permissions: BlobSASPermissions.parse("r"),
+			startsOn: new Date(new Date().valueOf() - 5 * 60 * 1000), // 시차 고려해 5분 전부터 유효
 			expiresOn: new Date(new Date().valueOf() + expirationHours * 60 * 60 * 1000),
 		};
 
 		const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
-		const newSasUrl = `${blockBlobClient.url}?${sasToken}`;
-		
-		console.log('SAS URL 재생성 성공:', fileUrl, '->', newSasUrl);
-		return newSasUrl;
+		return `${blockBlobClient.url}?${sasToken}`;
 		
 	} catch (error) {
-		console.error('SAS URL 재생성 실패:', fileUrl, error);
+		logger.error('SAS URL 재생성 실패:', { url: fileUrl, error: error.message });
 		return null;
 	}
 };
@@ -197,26 +290,25 @@ const regenerateMultipleSasUrls = async (fileUrls, containerName = 'contents-ima
 };
 
 /**
- * SAS URL이 만료되었는지 확인합니다.
+ * SAS URL이 만료되었는지 확인합니다. (3분 버퍼 적용)
  * @param {string} sasUrl - 확인할 SAS URL 
  * @returns {boolean} - 만료 여부 (true: 만료됨, false: 유효함)
  */
 const isSasUrlExpired = (sasUrl) => {
 	try {
 		const url = new URL(sasUrl);
-		const seParam = url.searchParams.get('se'); // SAS 만료 시간 파라미터
+		const seParam = url.searchParams.get('se');
+		if (!seParam) return true;
 		
-		if (!seParam) {
-			return true; // SAS 토큰이 없으면 만료된 것으로 간주
-		}
+		const expirationTime = new Date(seParam).getTime();
+        // 현재 시간보다 3분 전에 만료된다고 간주하여 미리 갱신
+		const buffer = 3 * 60 * 1000; 
+		const now = new Date().getTime();
 		
-		const expirationTime = new Date(seParam);
-		const now = new Date();
-		
-		return now >= expirationTime;
+		return now >= expirationTime - buffer;
 	} catch (error) {
-		console.error('SAS URL 만료 확인 실패:', sasUrl, error);
-		return true; // 오류 시 만료된 것으로 간주
+		logger.error('SAS URL 만료 확인 실패:', { url: sasUrl, error: error.message });
+		return true;
 	}
 };
 
@@ -227,13 +319,13 @@ const isSasUrlExpired = (sasUrl) => {
  * @param {Function} updateCallback - URL 업데이트 콜백 함수 (oldUrl, newUrl) => Promise
  * @returns {Promise<string>} - 새로운 URL 또는 기존 URL
  */
-const refreshUrlIfExpired = async (url, containerName, updateCallback) => {
+const refreshUrlIfExpired = async (url, updateCallback) => {
 	if (!url || !isSasUrlExpired(url)) {
 		return url; // 만료되지 않았으면 기존 URL 반환
 	}
 	
 	// 새 URL 생성
-	const newUrl = await regenerateSasUrl(url, containerName);
+	const newUrl = await regenerateSasUrl(url);
 	if (!newUrl) {
 		console.warn(`SAS URL 재생성 실패: ${url}`);
 		return url; // 실패 시 기존 URL 반환
@@ -255,6 +347,7 @@ const refreshUrlIfExpired = async (url, containerName, updateCallback) => {
 
 module.exports = {
 	uploadFile,
+    uploadStream, // 추가
 	uploadMultipleFiles,
 	deleteFile,
 	deleteMultipleFiles,
@@ -263,5 +356,6 @@ module.exports = {
 	regenerateMultipleSasUrls,
 	isSasUrlExpired,
 	// 범용 SAS URL 리프레시
-	refreshUrlIfExpired
+	refreshUrlIfExpired,
+	moveBlobToPermanentStorage
 }; 

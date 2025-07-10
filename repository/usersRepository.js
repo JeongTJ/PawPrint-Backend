@@ -180,7 +180,7 @@ const refreshUserProfileIfExpired = async (user) => {
 	if (user.profile) {
 		refreshedProfile = await storageRepository.refreshUrlIfExpired(
 			user.profile,
-			'profiles',
+			// 'profiles' 컨테이너 이름 인자 제거
 			async (oldUrl, newUrl) => {
 				await prisma.user.update({
 					where: { id: user.id },

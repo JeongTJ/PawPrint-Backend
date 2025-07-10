@@ -1,15 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const AIAgentService = require('../services/AIAgentServices');
+const contentsServices = require('../services/contentsServices');
+const { authMiddleware } = require('../middlewares/auth');
 const { logger } = require('../config/logger');
-const fs = require('fs');
 
 /**
  * @swagger
- * tags:
- *  name: AI
- *   description: AI 에이전트 기능
- * 
  * /api/v1/ai/create-slideshow:
  *   post:
  *     summary: 이미지 URL들로 슬라이드쇼 비디오 생성
@@ -34,12 +31,29 @@ const fs = require('fs');
  *                 - "https://your-storage-account.blob.core.windows.net/container/image2.png?sastoken"
  *     responses:
  *       '200':
- *         description: 생성된 슬라이드쇼 비디오 파일. API 테스트 툴이나 브라우저에서 바로 다운로드됩니다.
+ *         description: 비디오 임시 생성 성공. 앱에서 재생 가능한 URL과 게시물 작성에 필요한 ID를 반환합니다.
  *         content:
- *           video/mp4:
+ *           application/json:
  *             schema:
- *               type: string
- *               format: binary
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "슬라이드쇼 비디오가 임시 생성되었습니다."
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     videoUrl:
+ *                       type: string
+ *                       format: uri
+ *                       description: "앱에서 재생할 수 있는 임시 비디오 URL (예: 24시간 유효)"
+ *                     videoId:
+ *                       type: string
+ *                       description: "게시물 작성 시 이 비디오를 식별하기 위한 고유 ID"
+ *
  *       '400':
  *         description: "잘못된 요청 (예: 이미지 URL이 없거나 형식이 잘못됨)"
  *       '500':
@@ -52,50 +66,93 @@ router.post('/create-slideshow', async (req, res, next) => {
 		return res.status(400).json({ success: false, message: '이미지 URL 배열이 필요합니다.' });
 	}
 
-	let tempFilePath = null;
 	try {
 		logger.info(`AI 슬라이드쇼 생성 요청 받음. 이미지 개수: ${imageUrls.length}`);
-		tempFilePath = await AIAgentService.createSlideshowFromUrls(imageUrls);
+		const { videoUrl, videoId } = await AIAgentService.createSlideshowFromUrls(imageUrls);
 		
-		logger.info(`클라이언트에 파일 다운로드 시작: ${tempFilePath}`);
-		
-		// res.download()는 파일을 전송하고, 콜백 함수에서 후처리(파일 삭제)를 수행할 수 있습니다.
-		res.download(tempFilePath, (err) => {
-			if (err) {
-				// 응답이 이미 시작되었을 수 있으므로, 헤더를 보내는 에러 처리는 위험합니다.
-				// 에러를 로깅하는 것이 최선입니다.
-				logger.error('파일 다운로드 전송 중 오류 발생:', err);
-			} else {
-				logger.info('클라이언트로 파일 다운로드 성공.');
-			}
-			
-			// 다운로드 성공 여부와 관계없이 임시 파일을 삭제합니다.
-			fs.unlink(tempFilePath, (unlinkErr) => {
-				if (unlinkErr) {
-					logger.error(`임시 파일 삭제 실패: ${tempFilePath}`, unlinkErr);
-				} else {
-					logger.info(`임시 파일 삭제 완료: ${tempFilePath}`);
-				}
-			});
+		logger.info('클라이언트에 임시 비디오 정보 응답');
+		res.status(200).json({
+			success: true, // 이 부분은 다른 API와 형식이 달라도, 성공 응답은 유연하게 처리 가능합니다.
+			message: '슬라이드쇼 비디오가 임시 생성되었습니다.',
+			data: {
+				videoUrl: videoUrl,
+				videoId: videoId,
+			},
 		});
 
 	} catch (error) {
 		logger.error('슬라이드쇼 생성 파이프라인 중 오류 발생:', error);
-		
-		// 만약 파일이 생성되던 중에 오류가 발생했다면, 해당 파일을 정리합니다.
-		if (tempFilePath) {
-			fs.unlink(tempFilePath, (unlinkErr) => {
-				if (unlinkErr) {
-					logger.error(`오류 발생 후 임시 파일 정리 실패: ${tempFilePath}`, unlinkErr);
-				}
-			});
-		}
-		
-		if (!res.headersSent) {
-			next(error);
-		}
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            code: statusCode,
+            message: error.message || '슬라이드쇼 생성 중 서버 오류가 발생했습니다.',
+            result: null
+        });
 	}
 });
 
+/**
+ * @swagger
+ * /api/v1/ai/contents-with-video:
+ *   post:
+ *     summary: AI 비디오로 커뮤니티 게시물 생성
+ *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
+ *     description: AI로 생성한 비디오의 ID와 게시물 내용을 받아, 비디오를 영구 저장소로 옮기고 새 게시물을 생성합니다.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - body
+ *               - videoId
+ *             properties:
+ *               body:
+ *                 type: string
+ *                 description: 게시물 내용
+ *               videoId:
+ *                 type: string
+ *                 description: "/api/v1/ai/create-slideshow 에서 발급받은 videoId"
+ *     responses:
+ *       '201':
+ *         description: 게시물 생성 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ContentWithMediaResponse'
+ *       '400':
+ *         description: "필수 필드 누락"
+ *       '404':
+ *         description: "videoId에 해당하는 임시 비디오를 찾을 수 없음 (만료 등)"
+ *       '500':
+ *         description: "서버 오류"
+ */
+router.post('/contents-with-video', authMiddleware, async (req, res, next) => {
+    const { id: userId } = req.user;
+    const { body, videoId } = req.body;
+
+    try {
+        const newContent = await contentsServices.createContentWithVideo(userId, body, videoId);
+        
+        res.status(201).json({
+            // 성공 응답은 기존의 다른 게시물 생성 API와 형식을 맞추겠습니다.
+            code: 201,
+            message: 'AI 비디오 게시물이 성공적으로 생성되었습니다.',
+            result: newContent,
+        });
+
+    } catch (error) {
+        logger.error('AI 비디오 게시물 생성 중 컨트롤러 오류:', error);
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            code: statusCode,
+            message: error.message || 'AI 비디오 게시물 생성 중 서버 오류가 발생했습니다.',
+            result: null
+        });
+    }
+});
 
 module.exports = router; 
