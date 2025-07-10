@@ -10,6 +10,7 @@ const plansController = require('./plans');
 const missionController = require('./missions');
 const maintenanceController = require('./maintenance');
 const notificationsController = require('./notifications');
+const aiAgentController = require('./AIAgent');
 
 // 인증 라우트
 router.use('/auth', authController);
@@ -34,5 +35,9 @@ router.use('/notifications', notificationsController);
 
 // 유지보수 라우트
 router.use('/maintenance', maintenanceController);
+
+// AI 에이전트 라우트
+router.use('/v1/ai', aiAgentController);
+
 
 module.exports = router;

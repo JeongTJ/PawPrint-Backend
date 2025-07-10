@@ -206,6 +206,10 @@ const options = {
 			name: 'notifications',
 			description: '인앱 알림 관리 API',
 		},
+		{
+			name: 'AI',
+			description: 'AI 에이전트 기능 (슬라이드쇼 등)'
+		}
 	],
 };
 

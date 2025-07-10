@@ -351,7 +351,6 @@ const refreshMissionImageUrlsIfExpired = async (imagesArray) => {
         imagesArray.map(async (image) => {
             const newUrl = await storageRepository.refreshUrlIfExpired(
                 image.imageUrl,
-                'mission-images',
                 async (oldUrl, newUrl) => {
                     // DB 업데이트 콜백
                     await prisma.missionImage.update({
