@@ -203,10 +203,12 @@ const sendChatMessage = async (sessionId, message) => {
             requestData
         );
         
-		const tomorrow = new Date();
-		tomorrow.setDate(tomorrow.getDate() + 1);
-		response.data.json_date.date = formatKoreaDate(tomorrow, 'YYYY-MM-DD');
-		response.data.json_date.reminderOption = 60;
+		if (response.data.add_date) {
+			const tomorrow = new Date();
+			tomorrow.setDate(tomorrow.getDate() + 1);
+			response.data.json_date.date = formatKoreaDate(tomorrow, 'YYYY-MM-DD');
+			response.data.json_date.reminderOption = 60;
+		}
         logger.info('AI 챗봇 서버로부터 응답 수신 성공');
         return response.data;
 
