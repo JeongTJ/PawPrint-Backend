@@ -200,6 +200,34 @@ const missionMemoryRepository = {
         };
     },
 
+    // 날짜 범위로 미션 추억 조회
+    findByDateRange: async (userId, startDate, endDate) => {
+        return prisma.missionMemory.findMany({
+            where: {
+                userId,
+                dailyMission: {
+                    date: {
+                        gte: startDate,
+                        lte: endDate,
+                    },
+                },
+            },
+            include: {
+                images: true,
+                dailyMission: {
+                    include: {
+                        missionTemplate: true,
+                    },
+                },
+            },
+            orderBy: {
+                dailyMission: {
+                    date: 'desc',
+                },
+            },
+        });
+    },
+
     // 미션 추억 좋아요 토글
     toggleLike: async (memoryId) => {
         const memory = await prisma.missionMemory.findUnique({
