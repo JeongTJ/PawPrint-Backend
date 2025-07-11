@@ -271,18 +271,15 @@ const missionMemoryService = {
             const copyPromises = sourceImageUrls.map(url => copyBlob(url, 'contents-images'));
             const newImageUrls = await Promise.all(copyPromises);
             
-            // 3. 복제된 이미지 URL과 원본 추억의 본문을 사용하여 새 게시물 생성
-            const newContentData = {
+            // 3. Repository가 요구하는 형식에 맞춰 게시물 데이터 생성
+            const contentData = {
                 userId,
-                body: memory.content, // 원본 추억의 content를 사용
-                category: 'COMMUNITY'  // 공유 게시물은 'COMMUNITY' 카테고리로 고정
+                body: memory.content,
+                contentType: 'community',
+                media: newImageUrls.map(url => ({ fileUrl: url })) // { fileUrl: '...' } 형태의 배열로 수정
             };
-            const newImageObjects = newImageUrls.map(url => ({
-                url: url,
-                type: 'image'
-            }));
 
-            const newContent = await contentsRepository.createContentWithMedia(newContentData, newImageObjects);
+            const newContent = await contentsRepository.createContentWithMedia(contentData); // 단일 객체 전달
 
             return { success: true, data: newContent };
         } catch (error) {
