@@ -6,7 +6,7 @@ const {
 } = require('../repository/missionRepository');
 const contentsRepository = require('../repository/contentsRepository'); // 추가
 const { getKoreaTodayStart, getKoreaNow, formatKoreaDate, getUTCDateFromString } = require('../config/dateUtils');
-const { uploadFile, uploadMultipleFiles, deleteFile, copyBlob } = require('../repository/storageRepository'); // copyBlob 추가
+const { uploadFile, uploadMultipleFiles, deleteFile, copyBlob, refreshUrlIfExpired } = require('../repository/storageRepository'); // copyBlob 추가
 const moment = require('moment-timezone');
 
 // 미션 템플릿 관련 서비스
@@ -209,6 +209,27 @@ const _formatMemory = (memory, index) => {
     };
 };
 
+// 미션 추억의 이미지 URL들을 갱신하는 헬퍼 함수
+const _refreshMemoryImages = async (memory) => {
+    if (!memory || !memory.images || memory.images.length === 0) {
+        return memory;
+    }
+
+    const refreshedImages = await Promise.all(
+        memory.images.map(async (image) => {
+            const refreshedUrl = await refreshUrlIfExpired(
+                image.imageUrl,
+                async (oldUrl, newUrl) => {
+                    await missionImageRepository.update(image.id, { imageUrl: newUrl });
+                }
+            );
+            return { ...image, imageUrl: refreshedUrl };
+        })
+    );
+
+    return { ...memory, images: refreshedImages };
+};
+
 
 // 미션 추억 관련 서비스
 const missionMemoryService = {
@@ -216,8 +237,10 @@ const missionMemoryService = {
     getUserMissionMemories: async (userId) => {
         try {
             const memories = await missionMemoryRepository.findByUserId(userId);
-            // 각 추억에 번호를 부여하고 포맷팅
-            const formattedMemories = memories.map(_formatMemory);
+            
+            const refreshedMemories = await Promise.all(memories.map(_refreshMemoryImages));
+            
+            const formattedMemories = refreshedMemories.map(_formatMemory);
 
             // 최신순으로 정렬하여 반환
             formattedMemories.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -248,7 +271,10 @@ const missionMemoryService = {
             const end = getUTCDateFromString(endDate);
 
             const memories = await missionMemoryRepository.findByDateRange(userId, start, end);
-            const formattedMemories = memories.map(_formatMemory);
+            
+            const refreshedMemories = await Promise.all(memories.map(_refreshMemoryImages));
+            
+            const formattedMemories = refreshedMemories.map(_formatMemory);
 
             return { success: true, data: formattedMemories };
         } catch (error) {
@@ -285,14 +311,16 @@ const missionMemoryService = {
      */
     shareMemoryToCommunity: async (userId, memoryId) => {
         try {
+            let memory = await missionMemoryRepository.findById(memoryId);
             // 1. 원본 미션 추억 조회
-            const memory = await missionMemoryRepository.findById(memoryId);
             if (!memory || !memory.content) { // memory.content가 있는지도 확인
                 return { success: false, error: '공유할 미션 추억 또는 내용이 없습니다.' };
             }
             if (memory.userId !== userId) {
                 return { success: false, error: '자신의 미션 추억만 공유할 수 있습니다.' };
             }
+
+            memory = await _refreshMemoryImages(memory);
 
             // 2. 이미지 파일 복제
             const sourceImageUrls = memory.images.map(img => img.imageUrl);
@@ -364,12 +392,14 @@ const missionMemoryService = {
                 await missionImageRepository.createMany(imageData);
             }
             
+            let newMemory = await missionMemoryRepository.findById(memory.id);
+            newMemory = await _refreshMemoryImages(newMemory);
+            
             // 생성 후 총 추억 개수 카운트
             const totalMemories = await missionMemoryRepository.countByUserId(userId);
-            const finalMemory = await missionMemoryRepository.findById(memory.id);
 
             const formattedMemory = {
-                ..._formatMemory(finalMemory),
+                ..._formatMemory(newMemory),
                 memoryNumber: totalMemories // 새로 생성된 것이므로 마지막 번호
             };
 
@@ -396,13 +426,15 @@ const missionMemoryService = {
             // 미션 추억 내용 업데이트
             await missionMemoryRepository.update(memoryId, { content });
 
+            let updatedMemory = await missionMemoryRepository.findById(memoryId);
+            updatedMemory = await _refreshMemoryImages(updatedMemory);
+
             // 업데이트된 추억의 번호를 찾기 위해 전체 목록 조회
             const allUserMemories = await missionMemoryRepository.findByUserId(userId);
             const memoryIndex = allUserMemories.findIndex(m => m.id === memoryId);
 
             // 최종 데이터 조회 (이미지 포함)
-            const finalMemory = await missionMemoryRepository.findById(memoryId);
-            const formattedMemory = _formatMemory(finalMemory, memoryIndex);
+            const formattedMemory = _formatMemory(updatedMemory, memoryIndex);
             
             return { success: true, data: formattedMemory };
         } catch (error) {

@@ -320,7 +320,9 @@ const isSasUrlExpired = (sasUrl) => {
  * @returns {Promise<string>} - 새로운 URL 또는 기존 URL
  */
 const refreshUrlIfExpired = async (url, updateCallback) => {
+	// console.log(`${url} 이미지 리프레시 시작.`);
 	if (!url || !isSasUrlExpired(url)) {
+		// console.log(`${url} 이미지는 만료되지 않음.`);
 		return url; // 만료되지 않았으면 기존 URL 반환
 	}
 	
@@ -330,6 +332,7 @@ const refreshUrlIfExpired = async (url, updateCallback) => {
 		console.warn(`SAS URL 재생성 실패: ${url}`);
 		return url; // 실패 시 기존 URL 반환
 	}
+	// console.log(`${url} -> ${newUrl} 이미지 리프레시 완료.`);
 	
 	// DB 업데이트 (콜백 함수 사용)
 	if (updateCallback) {
