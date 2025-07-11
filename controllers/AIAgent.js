@@ -54,6 +54,9 @@ const { logger } = require('../config/logger');
  *                     videoId:
  *                       type: string
  *                       description: "게시물 작성 시 이 비디오를 식별하기 위한 고유 ID"
+ *                     title:
+ *                       type: string
+ *                       description: "AI가 생성한 슬라이드쇼 제목"
  *
  *       '400':
  *         description: "잘못된 요청 (예: 이미지 URL이 없거나 형식이 잘못됨)"
@@ -73,7 +76,7 @@ router.post('/create-slideshow', async (req, res, next) => {
 
 	try {
 		logger.info(`AI 슬라이드쇼 생성 요청 받음. 이미지 개수: ${imageUrls.length}`);
-		const { videoUrl, videoId } = await AIAgentService.createSlideshowFromUrls(imageUrls);
+		const { videoUrl, videoId, title } = await AIAgentService.createSlideshowFromUrls(imageUrls);
 		
 		logger.info('클라이언트에 임시 비디오 정보 응답');
 		res.status(200).json({
@@ -82,6 +85,7 @@ router.post('/create-slideshow', async (req, res, next) => {
 			result: {
 				videoUrl: videoUrl,
 				videoId: videoId,
+				title: title
 			},
 		});
 

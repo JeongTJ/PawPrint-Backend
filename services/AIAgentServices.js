@@ -84,7 +84,15 @@ const createSlideshowFromUrls = async (imageUrls) => {
 
         logger.info(`임시 비디오 업로드 완료. URL: ${url}, Video ID: ${videoId}`);
         
-        return { videoUrl: url, videoId: videoId };
+        // 헤더에서 제목 추출 (axios는 헤더 이름을 소문자로 변환)
+        const encodedTitle = response.headers['slideshow-title'] || null;
+        const title = encodedTitle ? decodeURIComponent(encodedTitle) : null;
+
+        return { 
+            videoUrl: url, 
+            videoId: videoId,
+            title: title // 제목 추가
+        };
 
     } catch (error) {
         logger.error('AI 에이전트 통신 오류:', error.response ? error.response.data : error.message);
