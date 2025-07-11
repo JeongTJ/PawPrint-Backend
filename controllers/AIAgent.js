@@ -4,6 +4,7 @@ const AIAgentService = require('../services/AIAgentServices');
 const contentsServices = require('../services/contentsServices');
 const { authMiddleware } = require('../middlewares/auth');
 const { logger } = require('../config/logger');
+// axios require 제거
 
 /**
  * @swagger
@@ -63,7 +64,11 @@ router.post('/create-slideshow', async (req, res, next) => {
 	const { imageUrls } = req.body;
 
 	if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
-		return res.status(400).json({ success: false, message: '이미지 URL 배열이 필요합니다.' });
+		return res.status(400).json({ 
+			code: 400,
+			message: '이미지 URL 배열이 필요합니다.',
+			result: null
+		});
 	}
 
 	try {
@@ -72,9 +77,9 @@ router.post('/create-slideshow', async (req, res, next) => {
 		
 		logger.info('클라이언트에 임시 비디오 정보 응답');
 		res.status(200).json({
-			success: true, // 이 부분은 다른 API와 형식이 달라도, 성공 응답은 유연하게 처리 가능합니다.
+			code: 200,
 			message: '슬라이드쇼 비디오가 임시 생성되었습니다.',
-			data: {
+			result: {
 				videoUrl: videoUrl,
 				videoId: videoId,
 			},
@@ -154,5 +159,162 @@ router.post('/contents-with-video', authMiddleware, async (req, res, next) => {
         });
     }
 });
+
+/**
+ * @swagger
+ * /api/v1/ai/chat/start:
+ *   post:
+ *     summary: 새로운 채팅 세션 시작
+ *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 채팅 세션이 성공적으로 시작됨
+ *
+ * /api/v1/ai/chat/send:
+ *   post:
+ *     summary: 채팅 메시지 전송
+ *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               message:
+ *                 type: string
+ *                 description: 사용자가 보내는 메시지
+ *     responses:
+ *       200:
+ *         description: AI의 응답 메시지
+ *
+ * /api/v1/ai/chat/end:
+ *   post:
+ *     summary: 채팅 세션 종료
+ *     tags: [AI]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - session_id
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: 종료할 채팅 세션의 ID입니다.
+ *             example:
+ *               session_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+ *     responses:
+ *       200:
+ *         description: 채팅 세션이 성공적으로 종료됨
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: "채팅 세션이 성공적으로 종료되었습니다."
+ *                 result:
+ *                   type: object
+ *                   description: AI 서버의 응답 데이터
+ *       400:
+ *         description: "요청 본문이 잘못되었습니다 (예: session_id 누락)."
+ *       500:
+ *         description: "서버 오류"
+ */
+
+router.post('/chat/start', authMiddleware, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const resultData = await AIAgentService.startChat(userId);
+        
+        res.status(200).json({
+            code: 200,
+            message: 'AI 챗봇 세션이 성공적으로 시작되었습니다.',
+            result: resultData
+        });
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            code: statusCode,
+            message: error.message || 'AI 챗봇 시작 중 서버 오류가 발생했습니다.',
+            result: error.data || null // 서비스에서 전달한 상세 오류 데이터를 포함
+        });
+    }
+});
+
+router.post('/chat/send', authMiddleware, async (req, res) => {
+    try {
+        const { session_id, message } = req.body;
+
+        if (!session_id || !message) {
+            return res.status(400).json({
+                code: 400,
+                message: 'session_id와 message는 필수입니다.',
+                result: null
+            });
+        }
+
+        const resultData = await AIAgentService.sendChatMessage(session_id, message);
+        
+        res.status(200).json({
+            code: 200,
+            message: 'AI의 응답이 성공적으로 수신되었습니다.',
+            result: resultData
+        });
+
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            code: statusCode,
+            message: error.message || '채팅 메시지 전송 중 서버 오류가 발생했습니다.',
+            result: error.data || null
+        });
+    }
+});
+
+router.post('/chat/end', authMiddleware, async (req, res) => {
+    try {
+        const { session_id } = req.body;
+
+        if (!session_id) {
+            return res.status(400).json({
+                code: 400,
+                message: 'session_id는 필수입니다.',
+                result: null
+            });
+        }
+        
+        const resultData = await AIAgentService.endChatSession(session_id);
+
+        res.status(200).json({
+            code: 200,
+            message: '채팅 세션이 성공적으로 종료되었습니다.',
+            result: resultData
+        });
+
+    } catch (error) {
+        const statusCode = error.statusCode || 500;
+        res.status(statusCode).json({
+            code: statusCode,
+            message: error.message || '채팅 세션 종료 중 서버 오류가 발생했습니다.',
+            result: error.data || null
+        });
+    }
+});
+
 
 module.exports = router; 
