@@ -230,6 +230,39 @@ const upload = require('../middlewares/upload');
  *             schema:
  *               $ref: '#/components/schemas/MissionMemory'
  *
+ * /api/missions/memories/range:
+ *   get:
+ *     summary: 날짜 범위별 미션 추억 조회
+ *     tags: [Mission Memories]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: startDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 조회 시작일 (YYYY-MM-DD)
+ *       - in: query
+ *         name: endDate
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: 조회 종료일 (YYYY-MM-DD)
+ *     responses:
+ *       '200':
+ *         description: 날짜 범위 내 미션 추억 목록
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/MissionMemory'
+ *       '400':
+ *         description: '잘못된 요청 (날짜 누락 등)'
+ *
  * /api/missions/memories/{id}:
  *   put:
  *     summary: 미션 추억 업데이트
@@ -734,6 +767,45 @@ router.get('/memories', authMiddleware, async (req, res) => {
 			message: "미션 추억을 성공적으로 조회했습니다.",
 			result: result.data
 		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
+});
+
+router.get('/memories/range', authMiddleware, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		const { startDate, endDate } = req.query;
+
+		if (!startDate || !endDate) {
+			return res.status(400).json({
+				code: 400,
+				message: "시작 날짜와 종료 날짜 파라미터가 필요합니다.",
+				result: null
+			});
+		}
+
+		const result = await missionMemoryService.findMemoriesByDateRange(userId, startDate, endDate);
+
+		if (!result.success) {
+			return res.status(400).json({
+				code: 400,
+				message: result.error,
+				result: null
+			});
+		}
+
+		res.json({
+			code: 200,
+			message: "날짜 범위별 미션 추억을 성공적으로 조회했습니다.",
+			result: result.data
+		});
+
 	} catch (error) {
 		const statusCode = error.statusCode || 500;
 		res.status(statusCode).json({

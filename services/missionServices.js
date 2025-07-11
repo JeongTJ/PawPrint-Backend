@@ -228,6 +228,34 @@ const missionMemoryService = {
         }
     },
 
+    // 날짜 범위로 미션 추억 조회
+    findMemoriesByDateRange: async (userId, startDate, endDate) => {
+        try {
+            const startMoment = moment(startDate, 'YYYY-MM-DD', true);
+            const endMoment = moment(endDate, 'YYYY-MM-DD', true);
+
+            // 날짜 형식 및 유효성 검증
+            if (!startMoment.isValid() || !endMoment.isValid()) {
+                return { success: false, error: '올바른 날짜 형식이 아닙니다 (YYYY-MM-DD).' };
+            }
+
+            // 시작일과 종료일이 같은 달에 속하는지 확인
+            if (startMoment.year() !== endMoment.year() || startMoment.month() !== endMoment.month()) {
+                return { success: false, error: '시작일과 종료일은 같은 달에 속해야 합니다.' };
+            }
+
+            const start = getUTCDateFromString(startDate);
+            const end = getUTCDateFromString(endDate);
+
+            const memories = await missionMemoryRepository.findByDateRange(userId, start, end);
+            const formattedMemories = memories.map(_formatMemory);
+
+            return { success: true, data: formattedMemories };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
     // 미션 추억 좋아요 토글
     toggleMissionMemoryLike: async (memoryId, userId) => {
         try {
