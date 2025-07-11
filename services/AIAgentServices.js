@@ -3,7 +3,10 @@ const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
 const { logger } = require('../config/logger');
+const { formatKoreaDate } = require('../config/dateUtils'); // dateUtils 추가
 const storageRepository = require('../repository/storageRepository');
+const usersRepository = require('../repository/usersRepository');
+const missionRepository = require('../repository/missionRepository');
 // storageRepository는 더 이상 필요 없습니다.
 
 // AI 서버 정보 (환경 변수에서 가져오기)
@@ -28,7 +31,6 @@ const downloadImage = async (url) => {
         throw new Error(`Failed to download image from ${url}`);
     }
 };
-
 
 /**
  * 여러 이미지 URL로부터 슬라이드쇼를 생성하고, 임시 저장 후 URL과 ID를 반환합니다.
@@ -91,8 +93,180 @@ const createSlideshowFromUrls = async (imageUrls) => {
         throw newError;
     }
 };
+    
+/**
+ * AI 채팅 세션 시작을 위한 데이터를 준비합니다.
+ * @param {number} userId - 사용자 ID
+ * @returns {Promise<object>} - AI 서버에 보낼 JSON 데이터
+ */
+const startChat = async (userId) => {
+	if (!AI_AGENT_URL || !AI_AGENT_PASSWORD) {
+		throw new Error('AI 에이전트 서버의 URL 또는 비밀번호가 설정되지 않았습니다.');
+	}
+    try {
+        // 1. 사용자 정보와 반려동물 정보 조회
+        const user = await usersRepository.findById(userId);
+        if (!user) {
+            const error = new Error('사용자를 찾을 수 없습니다.');
+            error.statusCode = 404;
+            throw error;
+        }
+        if (!user.pets || user.pets.length === 0) {
+            const error = new Error('채팅을 시작하려면 최소 한 마리의 반려동물이 등록되어 있어야 합니다.');
+            error.statusCode = 400;
+            throw error;
+        }
+        const petName = user.pets[0].name;
+        const userName = user.nickname;
 
+        // 2. 이미지가 있는 미션 추억 조회
+        const allMemories = await missionRepository.missionMemoryRepository.findByUserId(userId);
+        const memoriesWithImages = allMemories.filter(m => m.images && m.images.length > 0);
+
+        if (memoriesWithImages.length === 0) {
+            const error = new Error('AI와 대화하려면 이미지가 포함된 미션 추억이 하나 이상 있어야 합니다.');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // 3. 랜덤 추억 선택 및 정보 추출
+        const randomMemory = memoriesWithImages[Math.floor(Math.random() * memoriesWithImages.length)];
+        const memoryContent = randomMemory.content;
+        const imageUrl = randomMemory.images[0].imageUrl;
+
+        // 4. 최종 JSON 데이터 구성
+        const chatData = {
+            user_id: String(userId),
+            user_info: {
+                UserName: userName,
+                PetName: petName,
+                Image: imageUrl,
+                Memory: memoryContent
+            }
+        };
+
+        logger.info({ 'AI Chat Start Data Prepared': chatData }, 'AI 챗봇 시작 데이터 준비 완료');
+
+        logger.info(`AI 챗봇 서버에 요청 전송: ${AI_AGENT_URL}/api/v1/chat/start`);
+        const response = await axios.post(`${AI_AGENT_URL}/api/v1/chat/start`, chatData);
+
+        // 6. 외부 서버의 응답과 이미지 URL을 함께 반환
+        const aiResponse = response.data;
+        logger.info('AI 챗봇 서버로부터 응답 수신 성공');
+
+        return {
+            ...aiResponse,
+            imageUrl: imageUrl,
+        };
+
+    } catch (error) {
+        logger.error(error, 'AI 챗봇 시작 로직 처리 중 오류 발생');
+
+        // axios 에러인 경우 좀 더 상세하게 재구성하여 throw
+        if (error.response) {
+            const newError = new Error('AI 챗봇 서버에서 오류가 발생했습니다.');
+            newError.statusCode = error.response.status;
+            newError.data = error.response.data;
+            throw newError;
+        } else if (error.request) {
+            const newError = new Error('AI 챗봇 서버에 연결할 수 없습니다.');
+            newError.statusCode = 503; // Service Unavailable
+            throw newError;
+        }
+        
+        // 그 외 내부 오류 전파
+        throw error;
+    }
+};
+
+/**
+ * AI 챗봇에게 메시지를 전송하고 응답을 받습니다.
+ * @param {string} sessionId - 현재 채팅 세션 ID
+ * @param {string} message - 사용자가 보내는 메시지
+ * @returns {Promise<object>} - AI 챗봇의 응답 데이터
+ */
+const sendChatMessage = async (sessionId, message) => {
+    if (!AI_AGENT_URL) {
+        throw new Error('AI 에이전트 서버의 URL이 설정되지 않았습니다.');
+    }
+
+    try {
+        const requestData = {
+            session_id: sessionId,
+            message: message,
+        };
+        
+        logger.info(`AI 챗봇 서버에 메시지 전송: ${AI_AGENT_URL}/api/v1/chat/send`, requestData);
+
+        const response = await axios.post(
+            `${AI_AGENT_URL}/api/v1/chat/send`, 
+            requestData
+        );
+        
+		const tomorrow = new Date();
+		tomorrow.setDate(tomorrow.getDate() + 1);
+		response.data.json_date.date = formatKoreaDate(tomorrow, 'YYYY-MM-DD');
+		response.data.json_date.reminderOption = 60;
+        logger.info('AI 챗봇 서버로부터 응답 수신 성공');
+        return response.data;
+
+    } catch (error) {
+        logger.error(error, 'AI 챗봇 메시지 전송 중 오류 발생');
+        if (error.response) {
+            const newError = new Error('AI 챗봇 서버에서 오류가 발생했습니다.');
+            newError.statusCode = error.response.status;
+            newError.data = error.response.data;
+            throw newError;
+        } else if (error.request) {
+            const newError = new Error('AI 챗봇 서버에 연결할 수 없습니다.');
+            newError.statusCode = 503;
+            throw newError;
+        }
+        throw error;
+    }
+};
+
+/**
+ * AI 챗봇과의 세션을 종료합니다.
+ * @param {string} sessionId - 종료할 채팅 세션 ID
+ * @returns {Promise<object>} - AI 챗봇의 응답 데이터
+ */
+const endChatSession = async (sessionId) => {
+    if (!AI_AGENT_URL) {
+        throw new Error('AI 에이전트 서버의 URL이 설정되지 않았습니다.');
+    }
+
+    try {
+        const requestData = { session_id: sessionId };
+        logger.info(`AI 챗봇 서버에 세션 종료 요청: ${AI_AGENT_URL}/api/v1/chat/end`, requestData);
+
+        const response = await axios.post(
+            `${AI_AGENT_URL}/api/v1/chat/end`,
+            requestData
+        );
+
+        logger.info('AI 챗봇 서버로부터 세션 종료 응답 수신 성공');
+        return response.data;
+
+    } catch (error) {
+        logger.error(error, 'AI 챗봇 세션 종료 중 오류 발생');
+        if (error.response) {
+            const newError = new Error('AI 챗봇 서버에서 오류가 발생했습니다.');
+            newError.statusCode = error.response.status;
+            newError.data = error.response.data;
+            throw newError;
+        } else if (error.request) {
+            const newError = new Error('AI 챗봇 서버에 연결할 수 없습니다.');
+            newError.statusCode = 503;
+            throw newError;
+        }
+        throw error;
+    }
+};
 
 module.exports = {
-    createSlideshowFromUrls
+    createSlideshowFromUrls,
+    startChat,
+    sendChatMessage,
+    endChatSession,
 }; 
