@@ -38,13 +38,13 @@ const { logger } = require('../config/logger');
  *             schema:
  *               type: object
  *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
+ *                 code:
+ *                   type: integer
+ *                   example: 200
  *                 message:
  *                   type: string
  *                   example: "슬라이드쇼 비디오가 임시 생성되었습니다."
- *                 data:
+ *                 result:
  *                   type: object
  *                   properties:
  *                     videoUrl:
@@ -171,6 +171,35 @@ router.post('/contents-with-video', authMiddleware, async (req, res, next) => {
  *     responses:
  *       200:
  *         description: 채팅 세션이 성공적으로 시작됨
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: "AI 챗봇 세션이 성공적으로 시작되었습니다."
+ *                 result:
+ *                   type: object
+ *                   properties:
+ *                     session_id:
+ *                       type: string
+ *                       format: uuid
+ *                       description: "새로 생성된 채팅 세션 ID"
+ *                     response_text:
+ *                       type: string
+ *                       description: "AI의 첫 응답 메시지"
+ *                     imageUrl:
+ *                       type: string
+ *                       format: uri
+ *                       description: "대화의 주제가 된 이미지 URL"
+ *       400:
+ *         description: "잘못된 요청 (예: 사용자가 반려동물이나 미션 추억을 가지고 있지 않음)"
+ *       500:
+ *         description: "서버 오류 또는 AI 서버 통신 오류"
  *
  * /api/v1/ai/chat/send:
  *   post:
@@ -184,13 +213,83 @@ router.post('/contents-with-video', authMiddleware, async (req, res, next) => {
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - session_id
+ *               - message
  *             properties:
+ *               session_id:
+ *                 type: string
+ *                 format: uuid
+ *                 description: "현재 진행중인 채팅 세션 ID"
  *               message:
  *                 type: string
- *                 description: 사용자가 보내는 메시지
+ *                 description: "사용자가 보내는 메시지"
+ *             example:
+ *               session_id: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+ *               message: "우리 강아지가 좋아하는 간식은 뭘까?"
  *     responses:
  *       200:
  *         description: AI의 응답 메시지
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 code:
+ *                   type: integer
+ *                   example: 200
+ *                 message:
+ *                   type: string
+ *                   example: "AI의 응답이 성공적으로 수신되었습니다."
+ *                 result:
+ *                   type: object
+ *                   description: AI 서버의 응답 데이터
+ *                   properties:
+ *                     session_id:
+ *                       type: string
+ *                       format: uuid
+ *                       description: "현재 채팅 세션 ID (AI 서버가 응답에 포함시켜 반환)"
+ *                     response_text:
+ *                       type: string
+ *                       description: "AI의 텍스트 응답"
+ *                     add_date:
+ *                       type: boolean
+ *                       description: "일정 추가 제안 여부"
+ *                     json_date:
+ *                       type: object
+ *                       description: "일정 생성을 위한 추가 데이터 (add_date가 true일 경우 포함됨)"
+ *                       properties:
+ *                         title:
+ *                           type: string
+ *                           description: "제안된 일정 제목"
+ *                         description:
+ *                           type: string
+ *                           description: "제안된 일정 상세 내용"
+ *                         date:
+ *                           type: string
+ *                           format: date
+ *                           description: "제안된 일정 날짜 (YYYY-MM-DD)"
+ *                         time:
+ *                           type: string
+ *                           format: time
+ *                           description: "제안된 일정 시간 (HH:mm:ss)"
+ *                         reminderOption:
+ *                           type: integer
+ *                           description: "리마인더 옵션 (분 단위)"
+ *                   example:
+ *                     session_id: "f5578155-896f-46ac-8103-731d7db19934"
+ *                     response_text: "봄이가 좋아하는 간식을 찾는 것은 정말 즐거운 일이지만..."
+ *                     add_date: true
+ *                     json_date:
+ *                       title: "봄이 간식 관련 수의사 상담"
+ *                       description: "봄이가 간식을 먹고 이상 반응을 보이는지 확인하고..."
+ *                       date: "2025-07-12"
+ *                       time: "19:16:01"
+ *                       reminderOption: 60
+ *       400:
+ *         description: "요청 본문이 잘못되었습니다 (예: session_id 또는 message 누락)."
+ *       500:
+ *         description: "서버 오류"
  *
  * /api/v1/ai/chat/end:
  *   post:
@@ -229,7 +328,9 @@ router.post('/contents-with-video', authMiddleware, async (req, res, next) => {
  *                   example: "채팅 세션이 성공적으로 종료되었습니다."
  *                 result:
  *                   type: object
- *                   description: AI 서버의 응답 데이터
+ *                   description: "AI 서버의 응답 데이터. 응답 내용이 있을 경우 포함됩니다."
+ *                   example:
+ *                     message: "세션이 성공적으로 종료되었습니다."
  *       400:
  *         description: "요청 본문이 잘못되었습니다 (예: session_id 누락)."
  *       500:
