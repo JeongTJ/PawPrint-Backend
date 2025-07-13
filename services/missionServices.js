@@ -91,7 +91,19 @@ const dailyMissionService = {
                 missions = await dailyMissionRepository.findTodayMissions(userId);
             }
 
-            return { success: true, data: missions };
+            // 사용자의 전체 미션 히스토리 조회하여 미션 번호 계산
+            // const allUserMissions = await dailyMissionRepository.findMissionHistory(userId, new Date('2020-01-01'), new Date('2099-12-31'));
+            const allUserMissions = await dailyMissionRepository.findByUserId(userId);
+            // 미션에 순서 정보 추가 (전체 히스토리에서의 순서)
+            const missionsWithOrder = missions.map(mission => {
+                const missionIndex = allUserMissions.findIndex(m => m.id === mission.id);
+                return {
+                    ...mission,
+                    missionNumber: missionIndex !== -1 ? allUserMissions.length - missionIndex : 0
+                };
+            });
+
+            return { success: true, data: missionsWithOrder };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -136,7 +148,18 @@ const dailyMissionService = {
             const targetDate = getUTCDateFromString(date);
             const missions = await dailyMissionRepository.findByUserAndDate(userId, targetDate);
             
-            return { success: true, data: missions };
+            // 사용자의 전체 미션 히스토리 조회하여 미션 번호 계산
+            const allUserMissions = await dailyMissionRepository.findByUserId(userId);
+            // 미션에 순서 정보 추가 (전체 히스토리에서의 순서)
+            const missionsWithOrder = missions.map(mission => {
+                const missionIndex = allUserMissions.findIndex(m => m.id === mission.id);
+                return {
+                    ...mission,
+                    missionNumber: missionIndex !== -1 ? allUserMissions.length - missionIndex : 0
+                };
+            });
+            
+            return { success: true, data: missionsWithOrder };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -149,7 +172,19 @@ const dailyMissionService = {
             const end = getUTCDateFromString(endDate);
             
             const missions = await dailyMissionRepository.findMissionHistory(userId, start, end);
-            return { success: true, data: missions };
+            
+            // 사용자의 전체 미션 히스토리 조회하여 미션 번호 계산
+            const allUserMissions = await dailyMissionRepository.findByUserId(userId);
+            // 미션에 순서 정보 추가 (전체 히스토리에서의 순서)
+            const missionsWithOrder = missions.map(mission => {
+                const missionIndex = allUserMissions.findIndex(m => m.id === mission.id);
+                return {
+                    ...mission,
+                    missionNumber: missionIndex !== -1 ? allUserMissions.length - missionIndex : 0
+                };
+            });
+            
+            return { success: true, data: missionsWithOrder };
         } catch (error) {
             return { success: false, error: error.message };
         }
@@ -172,7 +207,17 @@ const dailyMissionService = {
                 !mission.isCompleted
             );
 
-            return { success: true, data: updatedMission };
+            // 사용자의 전체 미션 히스토리 조회하여 미션 번호 계산
+			const allUserMissions = await dailyMissionRepository.findByUserId(userId);
+            const missionIndex = allUserMissions.findIndex(m => m.id === updatedMission.id);
+
+            // 미션에 순서 정보 추가 (전체 히스토리에서의 순서)
+            const missionWithOrder = {
+                ...updatedMission,
+                missionNumber: missionIndex !== -1 ? allUserMissions.length - missionIndex : 0
+            };
+
+            return { success: true, data: missionWithOrder };
         } catch (error) {
             return { success: false, error: error.message };
         }
