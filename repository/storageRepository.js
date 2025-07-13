@@ -235,6 +235,7 @@ const uploadMultipleFiles = async (files, containerName = 'contents-images') => 
 const regenerateSasUrl = async (fileUrl, expirationHours = 24) => {
 	try {
 		const { containerName, blobName } = extractContainerAndBlobName(fileUrl);
+		console.log(`[containerName]: ${containerName}, [blobName]: ${blobName}`);
 		if (!containerName || !blobName) {
 			throw new Error('유효하지 않은 파일 URL에서 컨테이너와 blob 이름을 추출할 수 없습니다.');
 		}
@@ -315,7 +316,6 @@ const isSasUrlExpired = (sasUrl) => {
 /**
  * 범용 SAS URL 리프레시 함수 - 개별 URL 처리
  * @param {string} url - 확인할 URL
- * @param {string} containerName - 컨테이너 이름
  * @param {Function} updateCallback - URL 업데이트 콜백 함수 (oldUrl, newUrl) => Promise
  * @returns {Promise<string>} - 새로운 URL 또는 기존 URL
  */
@@ -338,7 +338,7 @@ const refreshUrlIfExpired = async (url, updateCallback) => {
 	if (updateCallback) {
 		try {
 			await updateCallback(url, newUrl);
-			console.log(`SAS URL 재생성 완료: ${containerName}`);
+			console.log(`SAS URL 재생성 완료: ${newUrl}`);
 		} catch (error) {
 			console.error(`SAS URL DB 업데이트 실패: ${error.message}`);
 			return url; // 실패 시 기존 URL 반환
