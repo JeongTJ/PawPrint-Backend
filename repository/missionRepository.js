@@ -71,6 +71,19 @@ const dailyMissionRepository = {
         const today = getKoreaTodayStart();
         return await dailyMissionRepository.findByUserAndDate(userId, today);
     },
+	
+	findByUserId: async (userId) => {
+		return await prisma.dailyMission.findMany({
+			where: { userId },
+			include: {
+				missionTemplate: true,
+				missionMemory: true
+			},
+			orderBy: {
+				date: 'desc'
+			}
+		});
+	},
 
     // 사용자의 미션 기록 조회 (기간별)
     findMissionHistory: async (userId, startDate, endDate) => {

@@ -88,8 +88,13 @@ const DailyMissionSchema = {
             description: '수정일시'
         },
         missionTemplate: {
-            $ref: '#/components/schemas/MissionTemplate'
-        }
+			$ref: '#/components/schemas/MissionTemplate'
+        },
+		missionNumber: {
+			type: 'integer',
+			description: '사용자의 전체 미션 중 몇 번째 미션인지 나타내는 번호 (최신이 가장 높은 번호)',
+			example: 15
+		},
     }
 };
 
