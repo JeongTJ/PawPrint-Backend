@@ -210,6 +210,7 @@ const sendChatMessage = async (sessionId, message) => {
             `${AI_AGENT_URL}/api/v1/chat/send`, 
             requestData
         );
+
         
 		if (response.data.add_date) {
 			const tomorrow = new Date();
@@ -218,6 +219,7 @@ const sendChatMessage = async (sessionId, message) => {
 			response.data.json_date.reminderOption = 60;
 		}
         logger.info('AI 챗봇 서버로부터 응답 수신 성공');
+		console.log(response.data);
         return response.data;
 
     } catch (error) {
