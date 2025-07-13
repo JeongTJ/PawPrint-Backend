@@ -221,6 +221,44 @@ const dailyMissionService = {
         } catch (error) {
             return { success: false, error: error.message };
         }
+    },
+
+    // 오늘 기준 일주일간 미션 현황 조회
+    getWeeklyMissionStatus: async (userId) => {
+        try {
+            const today = getKoreaTodayStart();
+            
+            // 오늘 날짜의 요일을 구해서 해당 주의 일요일부터 토요일까지 계산
+            const todayDayOfWeek = moment(today).day(); // 0: 일요일, 1: 월요일, ..., 6: 토요일
+            const daysFromSunday = todayDayOfWeek; // 일요일로부터 며칠 지났는지
+            
+            // 해당 주의 일요일 계산
+            const sunday = new Date(today);
+            sunday.setDate(today.getDate() - daysFromSunday);
+            
+            // 해당 주의 토요일 계산
+            const saturday = new Date(sunday);
+            saturday.setDate(sunday.getDate() + 6);
+
+            // 일주일간의 미션 조회 (일요일부터 토요일까지)
+            const weeklyMissions = await dailyMissionRepository.findMissionHistory(userId, sunday, saturday);
+            
+            // 사용자의 전체 미션 히스토리 조회하여 미션 번호 계산
+            const allUserMissions = await dailyMissionRepository.findByUserId(userId);
+            
+            // 미션에 순서 정보 추가 (전체 히스토리에서의 순서)
+            const missionsWithOrder = weeklyMissions.map(mission => {
+                const missionIndex = allUserMissions.findIndex(m => m.id === mission.id);
+                return {
+                    ...mission,
+                    missionNumber: missionIndex !== -1 ? allUserMissions.length - missionIndex : 0
+                };
+            });
+
+            return { success: true, data: missionsWithOrder };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     }
 };
 

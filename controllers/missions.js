@@ -179,6 +179,23 @@ const upload = require('../middlewares/upload');
  *             schema:
  *               $ref: '#/components/schemas/DailyMission'
  *
+ * /api/missions/daily/weekly-status:
+ *   get:
+ *     summary: 오늘 기준 일주일간 미션 현황 조회
+ *     tags: [Daily Missions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 일주일간 미션 현황 조회 성공
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               description: 일주일간의 모든 미션 목록 (일~토 순서)
+ *               items:
+ *                 $ref: '#/components/schemas/DailyMission'
+ *
  * /api/missions/memories:
  *   get:
  *     summary: 사용자의 모든 미션 추억 조회
@@ -734,6 +751,35 @@ router.patch('/daily/:id/toggle', authMiddleware, async (req, res) => {
 		res.json({
 			code: 200,
 			message: result.data.isCompleted ? "미션이 완료되었습니다." : "미션이 미완료로 변경되었습니다.",
+			result: result.data
+		});
+	} catch (error) {
+		const statusCode = error.statusCode || 500;
+		res.status(statusCode).json({
+			code: statusCode >= 500 ? 500 : (statusCode >= 400 ? 400 : 500),
+			message: error.message || 'Internal server error',
+			result: null
+		});
+	}
+});
+
+router.get('/daily/weekly-status', authMiddleware, async (req, res) => {
+	try {
+		const userId = req.user.id;
+		
+		const result = await dailyMissionService.getWeeklyMissionStatus(userId);
+
+		if (!result.success) {
+			return res.status(400).json({
+				code: 400,
+				message: result.error,
+				result: null
+			});
+		}
+
+		res.json({
+			code: 200,
+			message: "일주일간 미션 현황을 성공적으로 조회했습니다.",
 			result: result.data
 		});
 	} catch (error) {
